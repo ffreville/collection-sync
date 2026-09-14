@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'db/database.dart';
 import 'sync/device_identity.dart';
 import 'sync/sync_service.dart';
+import 'theme.dart';
 import 'ui/onboarding_screen.dart';
 import 'ui/users_screen.dart';
 
@@ -40,7 +41,9 @@ class CollectionSyncApp extends StatelessWidget {
           ],
           child: MaterialApp(
             title: 'CollectionSync',
-            theme: ThemeData(colorSchemeSeed: Colors.indigo, useMaterial3: true),
+            theme: AppTheme.light(),
+            darkTheme: AppTheme.dark(),
+            themeMode: ThemeMode.system,
             home: services.sync.identity.isOnboarded
                 ? const UsersScreen()
                 : const OnboardingScreen(),
