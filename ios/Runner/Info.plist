@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>CollectionSync utilise le réseau local pour synchroniser votre collection directement avec vos autres appareils, sans passer par un serveur.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>CollectionSync a besoin d'accéder à vos photos pour illustrer les objets de vos collections.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_collectionsync._tcp</string>

@@ -1,0 +1,18 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 390, "h": 844, "title": "1. Onboarding" },
+    { "file": "Users.dc.html", "x": 470, "y": 0, "w": 390, "h": 844, "title": "2. Utilisateurs" },
+    { "file": "Universes.dc.html", "x": 940, "y": 0, "w": 390, "h": 844, "title": "3. Univers" },
+    { "file": "Collections.dc.html", "x": 1410, "y": 0, "w": 390, "h": 844, "title": "4. Collections" },
+    { "file": "CollectionEditor.dc.html", "x": 0, "y": 964, "w": 390, "h": 844, "title": "5. Créer une collection" },
+    { "file": "ItemsGrid.dc.html", "x": 470, "y": 964, "w": 390, "h": 844, "title": "6. Objets — grille" },
+    { "file": "ItemDetail.dc.html", "x": 940, "y": 964, "w": 390, "h": 844, "title": "7. Fiche objet" },
+    { "file": "Sync.dc.html", "x": 1410, "y": 964, "w": 390, "h": 844, "title": "8. Synchronisation" },
+    { "file": "ConflictResolution.dc.html", "x": 0, "y": 1928, "w": 390, "h": 844, "title": "9. Résolution de conflit" },
+    { "file": "ItemsGridDark.dc.html", "x": 470, "y": 1928, "w": 390, "h": 844, "title": "6bis. Objets — mode sombre" }
+  ],
+  "annotations": [
+    { "id": "note-flow", "x": 0, "y": -80, "w": 900, "text": "CollectionSync — parcours principal : Onboarding -> Utilisateurs -> Univers -> Collections -> (créer collection / grille d'objets / fiche objet) -> Synchro -> Conflits" }
+  ],
+  "launch": { "view": "canvas" }
+}

@@ -1,0 +1,122 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+  :root{
+    --bg: oklch(0.965 0.008 75);
+    --surface: oklch(0.995 0.004 75);
+    --text: oklch(0.24 0.02 55);
+    --text-muted: oklch(0.50 0.02 55);
+    --accent: oklch(0.62 0.15 45);
+    --accent-contrast: oklch(0.99 0.004 75);
+    --accent-soft: oklch(0.93 0.035 45);
+    --border: oklch(0.90 0.012 70);
+  }
+  * { box-sizing: border-box; }
+  a { color: var(--accent); } a:hover { color: oklch(0.52 0.15 45); }
+  body { margin:0; font-family:'Plus Jakarta Sans', system-ui, sans-serif; }
+  .phone { width:390px; height:844px; background:var(--bg); color:var(--text); display:flex; flex-direction:column; overflow:hidden; }
+  .header { display:flex; align-items:center; gap:12px; padding: 56px 20px 14px; }
+  .iconbtn { width:36px;height:36px;border-radius:12px; display:flex;align-items:center;justify-content:center; background:var(--surface); border:1px solid var(--border); color:var(--text); flex-shrink:0; }
+  .header h1 { font-size:19px; font-weight:800; letter-spacing:-0.01em; margin:0; flex:1; }
+  .save { font-weight:700; font-size:14.5px; color:var(--accent); }
+  .content { flex:1; overflow:hidden; padding: 4px 20px 28px; display:flex; flex-direction:column; gap:22px; }
+  .field-label { font-size:13px; font-weight:700; margin-bottom:9px; display:block; }
+  .input { width:100%; border-radius:14px; border:1.5px solid var(--border); background:var(--surface); padding:13px 15px; font-size:15px; font-family:inherit; color:var(--text); }
+  .chipwrap { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { display:flex; align-items:center; gap:7px; padding:8px 8px 8px 14px; border-radius:999px; background:var(--accent-soft); color:var(--accent); font-size:13.5px; font-weight:600; }
+  .chip .x { width:18px; height:18px; border-radius:50%; background:oklch(0.62 0.15 45 / 0.18); display:flex; align-items:center; justify-content:center; }
+  .chip-add { display:flex; align-items:center; gap:6px; padding:8px 14px; border-radius:999px; border:1.5px dashed var(--border); color:var(--text-muted); font-size:13.5px; font-weight:600; }
+  .fieldrow { display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:12px 12px; }
+  .fieldicon { width:36px; height:36px; border-radius:11px; background:var(--accent-soft); color:var(--accent); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .fieldgrow { flex:1; min-width:0; }
+  .fname { font-weight:700; font-size:14px; }
+  .ftype { font-size:12px; color:var(--text-muted); margin-top:1px; }
+  .drag { color:var(--border); flex-shrink:0; }
+  .add-field { width:100%; border-radius:16px; padding:14px; font-weight:700; font-size:14px; border:1.5px dashed var(--border); background:transparent; color:var(--text); display:flex; align-items:center; justify-content:center; gap:8px; font-family:inherit; }
+</style>
+</helmet>
+<div class="phone">
+  <div class="header">
+    <div class="iconbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+    <h1>Nouvelle collection</h1>
+    <span class="save">Enregistrer</span>
+  </div>
+  <div class="content">
+
+    <div>
+      <label class="field-label">Nom de la collection</label>
+      <input class="input" value="Figurines Marvel Legends">
+    </div>
+
+    <div>
+      <label class="field-label">Catégories</label>
+      <div class="chipwrap">
+        <span class="chip">Action Figure <span class="x"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></span></span>
+        <span class="chip">Statue <span class="x"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></span></span>
+        <span class="chip">Pop! <span class="x"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></span></span>
+        <span class="chip-add"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Ajouter</span>
+      </div>
+    </div>
+
+    <div>
+      <label class="field-label">États</label>
+      <div class="chipwrap">
+        <span class="chip">Neuf <span class="x"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></span></span>
+        <span class="chip">Très bon état <span class="x"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></span></span>
+        <span class="chip">Bon état <span class="x"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></span></span>
+        <span class="chip-add"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Ajouter</span>
+      </div>
+    </div>
+
+    <div>
+      <label class="field-label">Champs personnalisés</label>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+
+        <div class="fieldrow">
+          <div class="fieldicon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h7"/></svg></div>
+          <div class="fieldgrow"><div class="fname">Éditeur</div><div class="ftype">Texte</div></div>
+          <svg class="drag" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="6" r="1.6"/><circle cx="8" cy="12" r="1.6"/><circle cx="8" cy="18" r="1.6"/><circle cx="16" cy="6" r="1.6"/><circle cx="16" cy="12" r="1.6"/><circle cx="16" cy="18" r="1.6"/></svg>
+        </div>
+
+        <div class="fieldrow">
+          <div class="fieldicon" style="font-weight:800; font-size:14px;">#</div>
+          <div class="fieldgrow"><div class="fname">Numéro d'édition</div><div class="ftype">Entier</div></div>
+          <svg class="drag" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="6" r="1.6"/><circle cx="8" cy="12" r="1.6"/><circle cx="8" cy="18" r="1.6"/><circle cx="16" cy="6" r="1.6"/><circle cx="16" cy="12" r="1.6"/><circle cx="16" cy="18" r="1.6"/></svg>
+        </div>
+
+        <div class="fieldrow">
+          <div class="fieldicon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+          <div class="fieldgrow"><div class="fname">Signé</div><div class="ftype">Booléen</div></div>
+          <svg class="drag" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="6" r="1.6"/><circle cx="8" cy="12" r="1.6"/><circle cx="8" cy="18" r="1.6"/><circle cx="16" cy="6" r="1.6"/><circle cx="16" cy="12" r="1.6"/><circle cx="16" cy="18" r="1.6"/></svg>
+        </div>
+
+        <div class="fieldrow">
+          <div class="fieldicon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div>
+          <div class="fieldgrow"><div class="fname">Date de sortie</div><div class="ftype">Date</div></div>
+          <svg class="drag" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="6" r="1.6"/><circle cx="8" cy="12" r="1.6"/><circle cx="8" cy="18" r="1.6"/><circle cx="16" cy="6" r="1.6"/><circle cx="16" cy="12" r="1.6"/><circle cx="16" cy="18" r="1.6"/></svg>
+        </div>
+
+        <div class="fieldrow">
+          <div class="fieldicon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l6-6"/><path d="M13 5l1.5-1.5a4 4 0 015.5 5.5L18 11"/><path d="M11 19l-1.5 1.5a4 4 0 01-5.5-5.5L6 13"/></svg></div>
+          <div class="fieldgrow"><div class="fname">Fiche produit</div><div class="ftype">Lien</div></div>
+          <svg class="drag" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="6" r="1.6"/><circle cx="8" cy="12" r="1.6"/><circle cx="8" cy="18" r="1.6"/><circle cx="16" cy="6" r="1.6"/><circle cx="16" cy="12" r="1.6"/><circle cx="16" cy="18" r="1.6"/></svg>
+        </div>
+
+      </div>
+    </div>
+
+    <button class="add-field"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Ajouter un champ</button>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

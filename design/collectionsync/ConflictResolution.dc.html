@@ -1,0 +1,92 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+  :root{
+    --bg: oklch(0.965 0.008 75);
+    --surface: oklch(0.995 0.004 75);
+    --text: oklch(0.24 0.02 55);
+    --text-muted: oklch(0.50 0.02 55);
+    --accent: oklch(0.62 0.15 45);
+    --accent-contrast: oklch(0.99 0.004 75);
+    --accent-soft: oklch(0.93 0.035 45);
+    --border: oklch(0.90 0.012 70);
+  }
+  * { box-sizing: border-box; }
+  a { color: var(--accent); } a:hover { color: oklch(0.52 0.15 45); }
+  body { margin:0; font-family:'Plus Jakarta Sans', system-ui, sans-serif; }
+  .phone { width:390px; height:844px; background:var(--bg); color:var(--text); display:flex; flex-direction:column; overflow:hidden; }
+  .header { display:flex; align-items:center; gap:12px; padding: 56px 20px 14px; }
+  .iconbtn { width:36px;height:36px;border-radius:12px; display:flex;align-items:center;justify-content:center; background:var(--surface); border:1px solid var(--border); color:var(--text); flex-shrink:0; }
+  .header h1 { font-size:19px; font-weight:800; letter-spacing:-0.01em; margin:0; }
+  .content { flex:1; overflow:hidden; padding: 6px 20px 24px; display:flex; flex-direction:column; gap:16px; }
+  .conflict-card { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:14px; display:flex; flex-direction:column; gap:10px; }
+  .iname { font-weight:800; font-size:15.5px; }
+  .versions { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .vcol { border:1.5px solid var(--border); border-radius:14px; padding:11px; display:flex; flex-direction:column; gap:6px; }
+  .vlabel { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-muted); }
+  .vfield { font-size:12.5px; line-height:1.5; }
+  .vfield b { font-weight:700; color:var(--text); }
+  .keepbtn { margin-top:4px; width:100%; padding:9px; border-radius:999px; border:1.5px solid var(--accent); background:transparent; color:var(--accent); font-weight:700; font-size:12px; font-family:inherit; }
+  .keepbtn.filled { background:var(--accent); color:var(--accent-contrast); border-color:var(--accent); }
+</style>
+</helmet>
+<div class="phone">
+  <div class="header">
+    <div class="iconbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+    <h1>Conflits à résoudre (2)</h1>
+  </div>
+  <div class="content">
+
+    <div class="conflict-card">
+      <div class="iname">Iron Man Mark 85</div>
+      <div class="versions">
+        <div class="vcol">
+          <div class="vlabel">Cet appareil</div>
+          <div class="vfield"><b>État</b> Neuf</div>
+          <div class="vfield"><b>Qté</b> 1</div>
+          <div class="vfield"><b>Notes</b> Acheté au Comic Con 2023.</div>
+          <button class="keepbtn filled">Garder celui-ci</button>
+        </div>
+        <div class="vcol">
+          <div class="vlabel">Camille</div>
+          <div class="vfield"><b>État</b> Très bon état</div>
+          <div class="vfield"><b>Qté</b> 1</div>
+          <div class="vfield"><b>Notes</b> Boîte légèrement abîmée.</div>
+          <button class="keepbtn">Garder celui-ci</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="conflict-card">
+      <div class="iname">Thanos — Infinity Saga</div>
+      <div class="versions">
+        <div class="vcol">
+          <div class="vlabel">Cet appareil</div>
+          <div class="vfield"><b>Valeur</b> 65,00 €</div>
+          <div class="vfield"><b>Qté</b> 1</div>
+          <div class="vfield" style="font-style:italic; color:var(--text-muted);">Notes vides</div>
+          <button class="keepbtn">Garder celui-ci</button>
+        </div>
+        <div class="vcol">
+          <div class="vlabel">Camille</div>
+          <div class="vfield"><b>Valeur</b> 72,00 €</div>
+          <div class="vfield"><b>Qté</b> 1</div>
+          <div class="vfield" style="font-style:italic; color:var(--text-muted);">Notes vides</div>
+          <button class="keepbtn filled">Garder celui-ci</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

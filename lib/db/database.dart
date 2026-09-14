@@ -7,37 +7,79 @@ import 'package:path_provider/path_provider.dart';
 
 part 'database.g.dart';
 
-/// A single item in the user's collection.
-///
-/// Sync/versioning fields (used to merge changes coming from another device
-/// without a server — see lib/sync/sync_service.dart):
-///  - [versionId] changes every time the item is edited.
-///  - [parentVersionId] / [parentVersionId2] point to the version(s) this one
-///    was derived from. A normal edit has one parent (the previous version).
-///    A manually-resolved conflict has two parents (the two versions the user
-///    chose between), which lets both devices recognize the resolution as a
-///    direct descendant of what they already have.
-///  - [deleted] is a tombstone flag: deletions are just another edit, so they
-///    sync and can conflict with a concurrent edit like anything else.
-class Items extends Table {
-  TextColumn get id => text()();
+/// Other identities (people) this device has synced with at least once.
+/// "Me" is not a row here — see lib/sync/device_identity.dart. Not versioned:
+/// this is local bookkeeping about peers, not content that gets merged.
+class KnownUsers extends Table {
+  TextColumn get id => text()(); // their DeviceIdentity.id
   TextColumn get name => text()();
-  TextColumn get category => text().withDefault(const Constant(''))();
-  TextColumn get notes => text().withDefault(const Constant(''))();
-  IntColumn get quantity => integer().withDefault(const Constant(1))();
+  DateTimeColumn get lastSyncedAt => dateTime()();
 
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Shared version/lineage bookkeeping, mixed into every synced entity table
+/// below. See lib/sync/entities.dart and lib/sync/sync_service.dart for how
+/// these fields are used to merge changes between devices without a server.
+mixin VersionedColumns on Table {
   TextColumn get versionId => text()();
   TextColumn get parentVersionId => text().nullable()();
   TextColumn get parentVersionId2 => text().nullable()();
   TextColumn get updatedByDevice => text()();
   DateTimeColumn get updatedAt => dateTime()();
   BoolColumn get deleted => boolean().withDefault(const Constant(false))();
+}
+
+/// A themed grouping of collections (e.g. "Marvel", "Disney"), owned by one
+/// user. Only its owner may edit it — see docs/spec-universes-collections.md.
+class Universes extends Table with VersionedColumns {
+  TextColumn get id => text()();
+  TextColumn get ownerId => text()();
+  TextColumn get name => text()();
 
   @override
   Set<Column> get primaryKey => {id};
 }
 
-@DriftDatabase(tables: [Items])
+/// A collection with a user-defined schema: which categories/states it
+/// allows, and which custom fields its items carry. See
+/// lib/models/field_schema.dart for the shape encoded in [schemaJson].
+class Collections extends Table with VersionedColumns {
+  TextColumn get id => text()();
+  TextColumn get universeId => text()();
+  TextColumn get ownerId => text()();
+  TextColumn get name => text()();
+  TextColumn get schemaJson => text()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// An object in a collection. The 7 default fields (see spec §3) are real
+/// columns for fast list/search/sort; everything the collection's schema
+/// adds beyond those lives in [customValuesJson] as {fieldKey: value}.
+class Items extends Table with VersionedColumns {
+  TextColumn get id => text()();
+  TextColumn get collectionId => text()();
+  TextColumn get ownerId => text()();
+
+  TextColumn get name => text()();
+  TextColumn get category => text().withDefault(const Constant(''))();
+  TextColumn get photoBase64 => text().nullable()();
+  IntColumn get quantity => integer().withDefault(const Constant(1))();
+  RealColumn get estimatedValue => real().nullable()();
+  TextColumn get state => text().withDefault(const Constant(''))();
+  TextColumn get notes => text().withDefault(const Constant(''))();
+
+  TextColumn get customValuesJson =>
+      text().withDefault(const Constant('{}'))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DriftDatabase(tables: [KnownUsers, Universes, Collections, Items])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting(super.executor);
@@ -45,15 +87,43 @@ class AppDatabase extends _$AppDatabase {
   @override
   int get schemaVersion => 1;
 
-  Stream<List<Item>> watchActiveItems() {
-    return (select(items)
-          ..where((t) => t.deleted.equals(false))
+  Stream<List<KnownUser>> watchKnownUsers() {
+    return (select(knownUsers)
           ..orderBy([(t) => OrderingTerm(expression: t.name)]))
         .watch();
   }
 
-  Future<Item?> itemById(String id) =>
-      (select(items)..where((t) => t.id.equals(id))).getSingleOrNull();
+  Stream<List<Universe>> watchUniversesOf(String ownerId) {
+    return (select(universes)
+          ..where((t) => t.ownerId.equals(ownerId) & t.deleted.equals(false))
+          ..orderBy([(t) => OrderingTerm(expression: t.name)]))
+        .watch();
+  }
+
+  Stream<List<Collection>> watchCollectionsOf(String universeId) {
+    return (select(collections)
+          ..where(
+              (t) => t.universeId.equals(universeId) & t.deleted.equals(false))
+          ..orderBy([(t) => OrderingTerm(expression: t.name)]))
+        .watch();
+  }
+
+  Future<int> countItemsOf(String collectionId) async {
+    final countExp = countAll();
+    final query = selectOnly(items)
+      ..addColumns([countExp])
+      ..where(items.collectionId.equals(collectionId) & items.deleted.equals(false));
+    final row = await query.getSingle();
+    return row.read(countExp) ?? 0;
+  }
+
+  Stream<List<Item>> watchItemsOf(String collectionId) {
+    return (select(items)
+          ..where(
+              (t) => t.collectionId.equals(collectionId) & t.deleted.equals(false))
+          ..orderBy([(t) => OrderingTerm(expression: t.name)]))
+        .watch();
+  }
 
   static QueryExecutor _openConnection() {
     return LazyDatabase(() async {

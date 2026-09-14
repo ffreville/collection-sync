@@ -1,0 +1,65 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+  :root{
+    --bg: oklch(0.965 0.008 75);
+    --surface: oklch(0.995 0.004 75);
+    --text: oklch(0.24 0.02 55);
+    --text-muted: oklch(0.50 0.02 55);
+    --accent: oklch(0.62 0.15 45);
+    --accent-contrast: oklch(0.99 0.004 75);
+    --accent-soft: oklch(0.93 0.035 45);
+    --border: oklch(0.90 0.012 70);
+  }
+  * { box-sizing: border-box; }
+  a { color: var(--accent); } a:hover { color: oklch(0.52 0.15 45); }
+  body { margin:0; font-family:'Plus Jakarta Sans', system-ui, sans-serif; }
+  .phone { width:390px; height:844px; background:var(--bg); color:var(--text); display:flex; flex-direction:column; overflow:hidden; }
+  .content { flex:1; display:flex; flex-direction:column; padding: 90px 28px 40px; }
+  .mark { width:64px; height:64px; border-radius:20px; background:var(--accent); color:var(--accent-contrast); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:24px; letter-spacing:-0.02em; margin-bottom:20px; }
+  h1 { font-size:28px; font-weight:800; letter-spacing:-0.02em; margin:0 0 10px; }
+  .sub { font-size:15px; line-height:1.5; color:var(--text-muted); margin:0 0 36px; max-width:300px; }
+  .art { height:150px; border-radius:24px; margin-bottom:40px; position:relative; overflow:hidden; background:var(--accent-soft); }
+  .dot { position:absolute; border-radius:50%; }
+  .spacer { flex:1; }
+  .field-label { font-size:13px; font-weight:700; color:var(--text); margin-bottom:8px; display:block; }
+  .input { width:100%; border-radius:16px; border:1.5px solid var(--border); background:var(--surface); padding:16px 18px; font-size:16px; font-family:inherit; color:var(--text); }
+  .input::placeholder{ color:var(--text-muted); }
+  .btn { width:100%; border-radius:999px; padding:17px 20px; font-weight:700; font-size:16px; border:none; display:flex; align-items:center; justify-content:center; gap:8px; margin-top:20px; font-family:inherit; }
+  .btn-primary { background:var(--accent); color:var(--accent-contrast); }
+  .hint { font-size:12.5px; color:var(--text-muted); text-align:center; margin-top:14px; line-height:1.5; }
+</style>
+</helmet>
+<div class="phone">
+  <div class="content">
+    <div class="mark">CS</div>
+    <h1>CollectionSync</h1>
+    <p class="sub">Gérez vos collections et synchronisez-les directement entre vos appareils, sur le même Wi‑Fi. Sans compte, sans serveur.</p>
+
+    <div class="art">
+      <div class="dot" style="width:120px;height:120px;background:oklch(0.62 0.15 45 / 0.18); top:-30px; right:-20px;"></div>
+      <div class="dot" style="width:80px;height:80px;background:oklch(0.62 0.15 45 / 0.30); bottom:-20px; left:20px;"></div>
+      <div class="dot" style="width:46px;height:46px;background:oklch(0.62 0.15 45 / 0.45); top:40px; left:130px;"></div>
+      <div class="dot" style="width:30px;height:30px;background:var(--accent); bottom:30px; right:60px;"></div>
+    </div>
+
+    <div class="spacer"></div>
+
+    <label class="field-label">Comment voulez-vous qu'on vous appelle&nbsp;?</label>
+    <input class="input" placeholder="Ex. Fred" value="Fred">
+
+    <button class="btn btn-primary">Continuer</button>
+    <p class="hint">Ce nom sera visible par les autres appareils lors d'une synchronisation.</p>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

@@ -1,18 +1,31 @@
 import 'package:drift/drift.dart';
 
 import '../db/database.dart';
+import 'entities.dart';
 
-/// Wire representation of an [Item], exchanged between devices during sync.
-/// Kept separate from the drift row class so the network protocol doesn't
-/// change shape every time the local DB schema does.
-class ItemPayload {
+/// Wire representation of an [Item]. The 7 default fields are real
+/// properties (see docs/spec-universes-collections.md §3); everything the
+/// owning collection's schema adds on top travels as [customValuesJson].
+class ItemPayload implements SyncEntity {
+  @override
   final String id;
+  final String collectionId;
+  final String ownerId;
+
   final String name;
   final String category;
-  final String notes;
+  final String? photoBase64;
   final int quantity;
+  final double? estimatedValue;
+  final String state;
+  final String notes;
+  final String customValuesJson;
+
+  @override
   final String versionId;
+  @override
   final String? parentVersionId;
+  @override
   final String? parentVersionId2;
   final String updatedByDevice;
   final DateTime updatedAt;
@@ -20,10 +33,16 @@ class ItemPayload {
 
   const ItemPayload({
     required this.id,
+    required this.collectionId,
+    required this.ownerId,
     required this.name,
     required this.category,
-    required this.notes,
+    this.photoBase64,
     required this.quantity,
+    this.estimatedValue,
+    required this.state,
+    required this.notes,
+    required this.customValuesJson,
     required this.versionId,
     this.parentVersionId,
     this.parentVersionId2,
@@ -34,10 +53,16 @@ class ItemPayload {
 
   factory ItemPayload.fromRow(Item row) => ItemPayload(
         id: row.id,
+        collectionId: row.collectionId,
+        ownerId: row.ownerId,
         name: row.name,
         category: row.category,
-        notes: row.notes,
+        photoBase64: row.photoBase64,
         quantity: row.quantity,
+        estimatedValue: row.estimatedValue,
+        state: row.state,
+        notes: row.notes,
+        customValuesJson: row.customValuesJson,
         versionId: row.versionId,
         parentVersionId: row.parentVersionId,
         parentVersionId2: row.parentVersionId2,
@@ -48,10 +73,16 @@ class ItemPayload {
 
   factory ItemPayload.fromJson(Map<String, dynamic> json) => ItemPayload(
         id: json['id'] as String,
+        collectionId: json['collectionId'] as String,
+        ownerId: json['ownerId'] as String,
         name: json['name'] as String,
         category: json['category'] as String? ?? '',
-        notes: json['notes'] as String? ?? '',
+        photoBase64: json['photoBase64'] as String?,
         quantity: json['quantity'] as int? ?? 1,
+        estimatedValue: (json['estimatedValue'] as num?)?.toDouble(),
+        state: json['state'] as String? ?? '',
+        notes: json['notes'] as String? ?? '',
+        customValuesJson: json['customValuesJson'] as String? ?? '{}',
         versionId: json['versionId'] as String,
         parentVersionId: json['parentVersionId'] as String?,
         parentVersionId2: json['parentVersionId2'] as String?,
@@ -63,12 +94,19 @@ class ItemPayload {
         deleted: json['deleted'] as bool? ?? false,
       );
 
+  @override
   Map<String, dynamic> toJson() => {
         'id': id,
+        'collectionId': collectionId,
+        'ownerId': ownerId,
         'name': name,
         'category': category,
-        'notes': notes,
+        'photoBase64': photoBase64,
         'quantity': quantity,
+        'estimatedValue': estimatedValue,
+        'state': state,
+        'notes': notes,
+        'customValuesJson': customValuesJson,
         'versionId': versionId,
         'parentVersionId': parentVersionId,
         'parentVersionId2': parentVersionId2,
@@ -79,10 +117,16 @@ class ItemPayload {
 
   ItemsCompanion toCompanion() => ItemsCompanion.insert(
         id: id,
+        collectionId: collectionId,
+        ownerId: ownerId,
         name: name,
         category: Value(category),
-        notes: Value(notes),
+        photoBase64: Value(photoBase64),
         quantity: Value(quantity),
+        estimatedValue: Value(estimatedValue),
+        state: Value(state),
+        notes: Value(notes),
+        customValuesJson: Value(customValuesJson),
         versionId: versionId,
         parentVersionId: Value(parentVersionId),
         parentVersionId2: Value(parentVersionId2),
@@ -90,11 +134,4 @@ class ItemPayload {
         updatedAt: updatedAt,
         deleted: Value(deleted),
       );
-
-  /// Whether this version was created directly from [ancestor] — i.e. it is
-  /// safe to replace [ancestor] with this version without asking the user
-  /// anything (a "fast-forward").
-  bool isDirectSuccessorOf(ItemPayload ancestor) =>
-      parentVersionId == ancestor.versionId ||
-      parentVersionId2 == ancestor.versionId;
 }

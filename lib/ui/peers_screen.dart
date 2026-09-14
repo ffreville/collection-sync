@@ -34,7 +34,7 @@ class PeersScreen extends StatelessWidget {
                 ],
               ),
             ),
-          if (sync.lastConflicts.isNotEmpty)
+          if (sync.totalConflicts > 0)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: FilledButton.tonal(
@@ -43,7 +43,7 @@ class PeersScreen extends StatelessWidget {
                       builder: (_) => const ConflictResolutionScreen()),
                 ),
                 child: Text(
-                  'Résoudre ${sync.lastConflicts.length} conflit(s)',
+                  'Résoudre ${sync.totalConflicts} conflit(s)',
                 ),
               ),
             ),

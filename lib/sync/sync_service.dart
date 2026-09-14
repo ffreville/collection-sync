@@ -7,16 +7,20 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../db/database.dart';
+import 'collection_payload.dart';
+import 'conflicts.dart';
 import 'device_identity.dart';
+import 'entities.dart';
 import 'item_payload.dart';
 import 'sync_protocol.dart';
+import 'universe_payload.dart';
 
 /// mDNS/Bonjour service type this app advertises and looks for.
 /// Syntax: _ServiceType._tcp — see the bonsoir package docs.
 const String kServiceType = '_collectionsync._tcp';
 
 /// Bumped if the wire format ever changes in a backwards-incompatible way.
-const int kSchemaVersion = 1;
+const int kSchemaVersion = 2;
 
 class DiscoveredPeer {
   final String deviceId;
@@ -32,20 +36,12 @@ class DiscoveredPeer {
   });
 }
 
-/// A pair of item versions that diverged (both were edited independently
-/// since they last agreed) and that the user must pick between.
-class SyncConflict {
-  final ItemPayload local;
-  final ItemPayload remote;
-
-  const SyncConflict({required this.local, required this.remote});
-}
-
 enum SyncStatus { idle, connecting, syncing, done, error }
 
 /// Owns local-network discovery (via mDNS/Bonjour, through the `bonsoir`
 /// package) and the sync sessions themselves (plain TCP sockets, no server
-/// involved anywhere). See _runSyncSession for the actual protocol.
+/// involved anywhere). Each session syncs Universes, then Collections, then
+/// Items, in that order — see _runSyncSession.
 class SyncService extends ChangeNotifier {
   final AppDatabase db;
   final DeviceIdentity identity;
@@ -57,10 +53,16 @@ class SyncService extends ChangeNotifier {
   final Map<String, DiscoveredPeer> _peers = {};
 
   List<DiscoveredPeer> get peers => _peers.values.toList(growable: false);
+  bool isOnline(String userId) => _peers.containsKey(userId);
 
   SyncStatus status = SyncStatus.idle;
   String? statusMessage;
-  List<SyncConflict> lastConflicts = [];
+
+  final List<UniverseConflict> universeConflicts = [];
+  final List<CollectionConflict> collectionConflicts = [];
+  final List<ItemConflict> itemConflicts = [];
+  int get totalConflicts =>
+      universeConflicts.length + collectionConflicts.length + itemConflicts.length;
 
   SyncService({required this.db, required this.identity});
 
@@ -137,11 +139,8 @@ class SyncService extends ChangeNotifier {
   Future<void> _acceptIncoming(Socket socket) async {
     final channel = MessageChannel(socket);
     try {
-      final conflicts = await _runSyncSession(channel);
-      if (conflicts.isNotEmpty) {
-        lastConflicts = [...lastConflicts, ...conflicts];
-        notifyListeners();
-      }
+      await _runSyncSession(channel);
+      notifyListeners();
     } catch (e) {
       debugPrint('Sync (incoming) failed: $e');
     } finally {
@@ -152,7 +151,6 @@ class SyncService extends ChangeNotifier {
   Future<void> syncWith(DiscoveredPeer peer) async {
     status = SyncStatus.connecting;
     statusMessage = 'Connexion à ${peer.deviceName}...';
-    lastConflicts = [];
     notifyListeners();
 
     Socket socket;
@@ -178,12 +176,11 @@ class SyncService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final conflicts = await _runSyncSession(channel);
-      lastConflicts = [...lastConflicts, ...conflicts];
+      final newConflicts = await _runSyncSession(channel);
       status = SyncStatus.done;
-      statusMessage = conflicts.isEmpty
+      statusMessage = newConflicts == 0
           ? 'Synchronisation terminée.'
-          : '${conflicts.length} conflit(s) à résoudre.';
+          : '$newConflicts conflit(s) à résoudre.';
     } catch (e) {
       status = SyncStatus.error;
       statusMessage = 'Échec de la synchronisation : $e';
@@ -194,20 +191,18 @@ class SyncService extends ChangeNotifier {
   }
 
   /// The actual protocol. Both sides of the connection run this exact same
-  /// sequence (whoever dialed in vs. whoever accepted the connection don't
-  /// need different roles — each step is symmetric):
+  /// sequence:
   ///
-  ///  1. hello    — exchange device id/name
-  ///  2. manifest — exchange {id, versionId} for every local item
-  ///  3. request  — each side asks for the full payload of ids where the
-  ///                other side's versionId differs from its own
-  ///  4. items    — the actual item payloads are sent back
-  ///  5. merge    — each incoming item is fast-forwarded or, if both sides
-  ///                changed it independently, recorded as a conflict for
-  ///                the user to resolve by hand (see resolveConflict)
-  ///  6. done     — small handshake so neither side closes the socket
-  ///                while the other is still writing
-  Future<List<SyncConflict>> _runSyncSession(MessageChannel channel) async {
+  ///  1. hello        — exchange device id/name, remember the peer as a
+  ///                     known user
+  ///  2. universes     — manifest/request/items round-trip (see _syncKind)
+  ///  3. collections   — same, once universes have settled
+  ///  4. items         — same, once collections have settled
+  ///  5. done          — small handshake so neither side closes the socket
+  ///                      while the other is still writing
+  ///
+  /// Returns how many new conflicts this session produced.
+  Future<int> _runSyncSession(MessageChannel channel) async {
     final queue = StreamQueue<SyncMessage>(channel.messages);
 
     channel.send(SyncMessage('hello', {
@@ -215,16 +210,101 @@ class SyncService extends ChangeNotifier {
       'deviceName': identity.name,
       'schemaVersion': kSchemaVersion,
     }));
-    await queue.next; // peer's hello — nothing to act on yet
+    final hello = await queue.next;
+    final peerId = hello.payload['deviceId'] as String;
+    final peerName = hello.payload['deviceName'] as String? ?? 'Appareil';
+    await db.into(db.knownUsers).insertOnConflictUpdate(KnownUsersCompanion.insert(
+          id: peerId,
+          name: peerName,
+          lastSyncedAt: DateTime.now().toUtc(),
+        ));
 
-    final localItems = await db.select(db.items).get();
-    final localById = {
-      for (final row in localItems) row.id: ItemPayload.fromRow(row),
-    };
-    channel.send(SyncMessage('manifest', {
-      'entries': localItems
-          .map((r) => {'id': r.id, 'versionId': r.versionId})
-          .toList(),
+    var newConflicts = 0;
+
+    final universeResult = await _syncKind<UniversePayload>(
+      channel: channel,
+      queue: queue,
+      kind: 'universe',
+      loadLocal: () async =>
+          (await db.select(db.universes).get()).map(UniversePayload.fromRow).toList(),
+      decode: UniversePayload.fromJson,
+    );
+    for (final remote in universeResult.incoming) {
+      final local = universeResult.localById[remote.id];
+      switch (decideMerge(local, remote)) {
+        case MergeAction.applied:
+          await db.into(db.universes).insertOnConflictUpdate(remote.toCompanion());
+        case MergeAction.conflict:
+          universeConflicts.add(UniverseConflict(local: local!, remote: remote));
+          newConflicts++;
+        case MergeAction.upToDate:
+          break;
+      }
+    }
+
+    final collectionResult = await _syncKind<CollectionPayload>(
+      channel: channel,
+      queue: queue,
+      kind: 'collection',
+      loadLocal: () async =>
+          (await db.select(db.collections).get()).map(CollectionPayload.fromRow).toList(),
+      decode: CollectionPayload.fromJson,
+    );
+    for (final remote in collectionResult.incoming) {
+      final local = collectionResult.localById[remote.id];
+      switch (decideMerge(local, remote)) {
+        case MergeAction.applied:
+          await db.into(db.collections).insertOnConflictUpdate(remote.toCompanion());
+        case MergeAction.conflict:
+          collectionConflicts.add(CollectionConflict(local: local!, remote: remote));
+          newConflicts++;
+        case MergeAction.upToDate:
+          break;
+      }
+    }
+
+    final itemResult = await _syncKind<ItemPayload>(
+      channel: channel,
+      queue: queue,
+      kind: 'item',
+      loadLocal: () async => (await db.select(db.items).get()).map(ItemPayload.fromRow).toList(),
+      decode: ItemPayload.fromJson,
+    );
+    for (final remote in itemResult.incoming) {
+      final local = itemResult.localById[remote.id];
+      switch (decideMerge(local, remote)) {
+        case MergeAction.applied:
+          await db.into(db.items).insertOnConflictUpdate(remote.toCompanion());
+        case MergeAction.conflict:
+          itemConflicts.add(ItemConflict(local: local!, remote: remote));
+          newConflicts++;
+        case MergeAction.upToDate:
+          break;
+      }
+    }
+
+    channel.send(SyncMessage('done', {}));
+    await queue.next;
+    await queue.cancel(immediate: true);
+
+    return newConflicts;
+  }
+
+  /// One manifest/request/items round-trip for a given entity kind. Kept
+  /// generic so Universes/Collections/Items don't each need their own copy
+  /// of this network exchange — only how to load/decode them differs.
+  Future<_SyncKindResult<T>> _syncKind<T extends SyncEntity>({
+    required MessageChannel channel,
+    required StreamQueue<SyncMessage> queue,
+    required String kind,
+    required Future<List<T>> Function() loadLocal,
+    required T Function(Map<String, dynamic>) decode,
+  }) async {
+    final localList = await loadLocal();
+    final localById = {for (final e in localList) e.id: e};
+
+    channel.send(SyncMessage('${kind}_manifest', {
+      'entries': localList.map((e) => {'id': e.id, 'versionId': e.versionId}).toList(),
     }));
     final manifestMsg = await queue.next;
     final remoteEntries =
@@ -235,72 +315,83 @@ class SyncService extends ChangeNotifier {
       final id = entry['id'] as String;
       final versionId = entry['versionId'] as String;
       final local = localById[id];
-      if (local == null || local.versionId != versionId) {
-        wanted.add(id);
-      }
+      if (local == null || local.versionId != versionId) wanted.add(id);
     }
 
-    channel.send(SyncMessage('request', {'ids': wanted}));
+    channel.send(SyncMessage('${kind}_request', {'ids': wanted}));
     final requestMsg = await queue.next;
     final requestedIds = (requestMsg.payload['ids'] as List).cast<String>();
-    channel.send(SyncMessage('items', {
+    channel.send(SyncMessage('${kind}_items', {
       'items': requestedIds
           .where(localById.containsKey)
           .map((id) => localById[id]!.toJson())
           .toList(),
     }));
     final itemsMsg = await queue.next;
-    final incoming = (itemsMsg.payload['items'] as List)
-        .cast<Map<String, dynamic>>()
-        .map(ItemPayload.fromJson)
-        .toList();
+    final incoming =
+        (itemsMsg.payload['items'] as List).cast<Map<String, dynamic>>().map(decode).toList();
 
-    final conflicts = <SyncConflict>[];
-    for (final remote in incoming) {
-      final conflict = await _applyIncoming(remote, localById[remote.id]);
-      if (conflict != null) conflicts.add(conflict);
-    }
-
-    channel.send(SyncMessage('done', {}));
-    await queue.next;
-    await queue.cancel(immediate: true);
-
-    return conflicts;
-  }
-
-  Future<SyncConflict?> _applyIncoming(
-      ItemPayload remote, ItemPayload? local) async {
-    if (local == null) {
-      await db.into(db.items).insertOnConflictUpdate(remote.toCompanion());
-      return null;
-    }
-    if (local.versionId == remote.versionId) {
-      return null; // already in sync
-    }
-    if (remote.isDirectSuccessorOf(local)) {
-      await db.into(db.items).insertOnConflictUpdate(remote.toCompanion());
-      return null; // fast-forward: remote is simply ahead of us
-    }
-    if (local.isDirectSuccessorOf(remote)) {
-      return null; // we're already ahead; our version will reach them
-    }
-    return SyncConflict(local: local, remote: remote); // diverged
+    return _SyncKindResult(localById: localById, incoming: incoming);
   }
 
   /// Resolves a conflict by keeping one side's content and recording a
   /// "merge" version whose two parents are the two versions the user chose
-  /// between — that way, whichever peer(s) sent either version will
-  /// recognize this new version as a direct descendant of what they already
-  /// have, and won't re-flag the same conflict on the next sync.
-  Future<void> resolveConflict(SyncConflict conflict,
-      {required bool keepLocal}) async {
+  /// between — see docs/spec-universes-collections.md §4: whichever peer(s)
+  /// sent either version will recognize this new version as a direct
+  /// descendant of what they already have, and won't re-flag the same
+  /// conflict on the next sync.
+  Future<void> resolveUniverseConflict(UniverseConflict conflict, {required bool keepLocal}) async {
+    final chosen = keepLocal ? conflict.local : conflict.remote;
+    final merged = UniversePayload(
+      id: chosen.id,
+      ownerId: chosen.ownerId,
+      name: chosen.name,
+      versionId: const Uuid().v4(),
+      parentVersionId: conflict.local.versionId,
+      parentVersionId2: conflict.remote.versionId,
+      updatedByDevice: identity.id,
+      updatedAt: DateTime.now().toUtc(),
+      deleted: chosen.deleted,
+    );
+    await db.into(db.universes).insertOnConflictUpdate(merged.toCompanion());
+    universeConflicts.removeWhere((c) => c.local.id == conflict.local.id);
+    notifyListeners();
+  }
+
+  Future<void> resolveCollectionConflict(CollectionConflict conflict, {required bool keepLocal}) async {
+    final chosen = keepLocal ? conflict.local : conflict.remote;
+    final merged = CollectionPayload(
+      id: chosen.id,
+      universeId: chosen.universeId,
+      ownerId: chosen.ownerId,
+      name: chosen.name,
+      schemaJson: chosen.schemaJson,
+      versionId: const Uuid().v4(),
+      parentVersionId: conflict.local.versionId,
+      parentVersionId2: conflict.remote.versionId,
+      updatedByDevice: identity.id,
+      updatedAt: DateTime.now().toUtc(),
+      deleted: chosen.deleted,
+    );
+    await db.into(db.collections).insertOnConflictUpdate(merged.toCompanion());
+    collectionConflicts.removeWhere((c) => c.local.id == conflict.local.id);
+    notifyListeners();
+  }
+
+  Future<void> resolveItemConflict(ItemConflict conflict, {required bool keepLocal}) async {
     final chosen = keepLocal ? conflict.local : conflict.remote;
     final merged = ItemPayload(
       id: chosen.id,
+      collectionId: chosen.collectionId,
+      ownerId: chosen.ownerId,
       name: chosen.name,
       category: chosen.category,
-      notes: chosen.notes,
+      photoBase64: chosen.photoBase64,
       quantity: chosen.quantity,
+      estimatedValue: chosen.estimatedValue,
+      state: chosen.state,
+      notes: chosen.notes,
+      customValuesJson: chosen.customValuesJson,
       versionId: const Uuid().v4(),
       parentVersionId: conflict.local.versionId,
       parentVersionId2: conflict.remote.versionId,
@@ -309,8 +400,13 @@ class SyncService extends ChangeNotifier {
       deleted: chosen.deleted,
     );
     await db.into(db.items).insertOnConflictUpdate(merged.toCompanion());
-    lastConflicts =
-        lastConflicts.where((c) => c.local.id != conflict.local.id).toList();
+    itemConflicts.removeWhere((c) => c.local.id == conflict.local.id);
     notifyListeners();
   }
+}
+
+class _SyncKindResult<T extends SyncEntity> {
+  final Map<String, T> localById;
+  final List<T> incoming;
+  const _SyncKindResult({required this.localById, required this.incoming});
 }
