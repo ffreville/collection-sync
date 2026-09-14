@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -241,6 +242,47 @@ class _ItemEditScreenState extends State<ItemEditScreen> {
             ),
           ],
         );
+      case FieldType.file:
+        final value = _customValues[field.key] as Map<String, dynamic>?;
+        final fileName = value?['name'] as String?;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(field.label, style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: widget.readOnly ? null : () => _pickFile(field.key),
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Theme.of(context).colorScheme.outline),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.attach_file, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        fileName ?? 'Aucun fichier',
+                        overflow: TextOverflow.ellipsis,
+                        style: fileName == null
+                            ? TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)
+                            : null,
+                      ),
+                    ),
+                    if (fileName != null && !widget.readOnly)
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 18),
+                        onPressed: () => setState(() => _customValues[field.key] = null),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
     }
   }
 
@@ -254,6 +296,19 @@ class _ItemEditScreenState extends State<ItemEditScreen> {
     if (picked != null) {
       setState(() => _customValues[key] = picked.toIso8601String());
     }
+  }
+
+  /// Files are embedded as base64 in the sync payload, same mechanism as
+  /// photo — practical on a fast local Wi-Fi, but note this means a large
+  /// file bloats that sync message; there's no chunked transfer yet (see
+  /// docs/spec-universes-collections.md §5).
+  Future<void> _pickFile(String key) async {
+    final picked = await FilePicker.pickFile();
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    setState(() {
+      _customValues[key] = {'name': picked.name, 'base64': base64Encode(bytes)};
+    });
   }
 
   Future<String?> _pickImageBase64() async {
@@ -297,6 +352,7 @@ class _ItemEditScreenState extends State<ItemEditScreen> {
         case FieldType.date:
         case FieldType.singleChoice:
         case FieldType.photo:
+        case FieldType.file:
           break; // already kept up to date in _customValues directly
       }
     }

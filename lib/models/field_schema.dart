@@ -3,7 +3,7 @@ import 'dart:convert';
 /// The types a collection's custom field can have. `singleChoice` is also
 /// how the built-in Catégorie/État default fields work — their option list
 /// just lives directly on [CollectionSchema] instead of a [FieldDefinition].
-enum FieldType { text, longText, integer, decimal, boolean, date, singleChoice, photo, url }
+enum FieldType { text, longText, integer, decimal, boolean, date, singleChoice, photo, file, url }
 
 extension FieldTypeLabel on FieldType {
   String get label => switch (this) {
@@ -15,6 +15,7 @@ extension FieldTypeLabel on FieldType {
         FieldType.date => 'Date',
         FieldType.singleChoice => 'Choix unique',
         FieldType.photo => 'Photo',
+        FieldType.file => 'Fichier',
         FieldType.url => 'Lien',
       };
 }

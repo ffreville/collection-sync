@@ -65,6 +65,7 @@ class UniversesScreen extends StatelessWidget {
                   ),
                 ),
                 onLongPress: isMine ? () => _confirmDelete(context, repo, universe) : null,
+                onRename: isMine ? () => _renameUniverse(context, repo, universe) : null,
               );
             },
           );
@@ -107,6 +108,31 @@ class UniversesScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _renameUniverse(
+      BuildContext context, UniverseRepository repo, Universe universe) async {
+    final controller = TextEditingController(text: universe.name);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Renommer l'univers"),
+        content: TextField(controller: controller, autofocus: true),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Renommer'),
+          ),
+        ],
+      ),
+    );
+    if (name != null && name.isNotEmpty && name != universe.name) {
+      await repo.rename(universe, name);
+    }
+  }
+
   Future<void> _confirmDelete(
       BuildContext context, UniverseRepository repo, Universe universe) async {
     final confirmed = await showDialog<bool>(
@@ -139,12 +165,14 @@ class _UniverseTile extends StatelessWidget {
   final bool isMine;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
+  final VoidCallback? onRename;
 
   const _UniverseTile({
     required this.universe,
     required this.isMine,
     required this.onTap,
     this.onLongPress,
+    this.onRename,
   });
 
   @override
@@ -152,30 +180,50 @@ class _UniverseTile extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Card(
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onLongPress,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                color: scheme.primaryContainer,
-                alignment: Alignment.center,
-                child: Icon(Icons.auto_awesome_mosaic_outlined, color: scheme.primary, size: 32),
+      child: Stack(
+        children: [
+          InkWell(
+            onTap: onTap,
+            onLongPress: onLongPress,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    color: scheme.primaryContainer,
+                    alignment: Alignment.center,
+                    child:
+                        Icon(Icons.auto_awesome_mosaic_outlined, color: scheme.primary, size: 32),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                  child: Text(
+                    universe.name,
+                    style: Theme.of(context).textTheme.titleSmall,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (onRename != null)
+            Positioned(
+              top: 6,
+              right: 6,
+              child: Material(
+                color: scheme.surface.withValues(alpha: 0.85),
+                shape: const CircleBorder(),
+                child: IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  tooltip: "Renommer l'univers",
+                  onPressed: onRename,
+                  visualDensity: VisualDensity.compact,
+                ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-              child: Text(
-                universe.name,
-                style: Theme.of(context).textTheme.titleSmall,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }

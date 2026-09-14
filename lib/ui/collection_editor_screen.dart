@@ -73,18 +73,44 @@ class _CollectionEditorScreenState extends State<CollectionEditorScreen> {
           const SizedBox(height: 20),
           Text('Champs personnalisés', style: Theme.of(context).textTheme.labelLarge),
           const SizedBox(height: 8),
-          for (final field in _customFields)
-            Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: CircleAvatar(child: Icon(_iconFor(field.type))),
-                title: Text(field.label),
-                subtitle: Text(field.type.label),
-                trailing: IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => setState(() => _customFields.remove(field)),
-                ),
-              ),
+          if (_customFields.isNotEmpty)
+            ReorderableListView(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              onReorderItem: (oldIndex, newIndex) {
+                setState(() {
+                  final field = _customFields.removeAt(oldIndex);
+                  _customFields.insert(newIndex, field);
+                });
+              },
+              children: [
+                for (var i = 0; i < _customFields.length; i++)
+                  Card(
+                    key: ValueKey(_customFields[i].key),
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      leading: CircleAvatar(child: Icon(_iconFor(_customFields[i].type))),
+                      title: Text(_customFields[i].label),
+                      subtitle: Text(_customFields[i].type.label),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () => setState(() => _customFields.removeAt(i)),
+                          ),
+                          ReorderableDragStartListener(
+                            index: i,
+                            child: const Padding(
+                              padding: EdgeInsets.only(left: 4),
+                              child: Icon(Icons.drag_handle),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
             ),
           OutlinedButton.icon(
             onPressed: _addField,
@@ -105,6 +131,7 @@ class _CollectionEditorScreenState extends State<CollectionEditorScreen> {
         FieldType.date => Icons.calendar_today_outlined,
         FieldType.singleChoice => Icons.list_alt,
         FieldType.photo => Icons.photo_camera_outlined,
+        FieldType.file => Icons.attach_file,
         FieldType.url => Icons.link,
       };
 
