@@ -1,0 +1,9 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 340, "h": 340, "title": "Icône d'app" },
+    { "file": "AdaptiveForeground.dc.html", "x": 420, "y": 0, "w": 340, "h": 340, "title": "Icône adaptative Android (avant-plan)" },
+    { "file": "SplashLight.dc.html", "x": 0, "y": 460, "w": 390, "h": 844, "title": "Écran de lancement — clair" },
+    { "file": "SplashDark.dc.html", "x": 470, "y": 460, "w": 390, "h": 844, "title": "Écran de lancement — sombre" }
+  ],
+  "launch": { "view": "canvas" }
+}

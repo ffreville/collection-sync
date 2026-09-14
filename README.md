@@ -6,7 +6,8 @@ serveur**.
 
 Le concept complet (Utilisateurs → Univers → Collections à schéma libre →
 Objets) est détaillé dans [docs/spec-universes-collections.md](docs/spec-universes-collections.md).
-Des maquettes visuelles existent aussi dans [design/collectionsync/](design/collectionsync/).
+Des maquettes visuelles existent aussi dans [design/collectionsync/](design/collectionsync/), et
+l'icône/écran de lancement dans [design/collectionsync-icon/](design/collectionsync-icon/).
 
 ## Comment ça marche
 
@@ -92,6 +93,15 @@ Régénérer le code de la base de données après une modification du schéma
 
 ```bash
 dart run build_runner build
+```
+
+Régénérer l'icône d'app / l'écran de lancement après une modification des
+images source (`assets/icon/*.png`, régénérées elles-mêmes par
+`design/collectionsync-icon/generate_assets.py` à partir du design) :
+
+```bash
+dart run flutter_launcher_icons
+dart run flutter_native_splash:create
 ```
 
 ## Limites connues (MVP)
