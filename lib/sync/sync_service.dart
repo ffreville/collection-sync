@@ -70,6 +70,15 @@ class SyncService extends ChangeNotifier {
     _server = await ServerSocket.bind(InternetAddress.anyIPv4, 0);
     _server!.listen(_acceptIncoming);
 
+    await _startBroadcast();
+
+    _discovery = BonsoirDiscovery(type: kServiceType);
+    await _discovery!.initialize();
+    _discovery!.eventStream!.listen(_onDiscoveryEvent);
+    await _discovery!.start();
+  }
+
+  Future<void> _startBroadcast() async {
     final service = BonsoirService(
       name: '${identity.name}-${identity.id.substring(0, 8)}',
       type: kServiceType,
@@ -79,11 +88,16 @@ class SyncService extends ChangeNotifier {
     _broadcast = BonsoirBroadcast(service: service);
     await _broadcast!.initialize();
     await _broadcast!.start();
+  }
 
-    _discovery = BonsoirDiscovery(type: kServiceType);
-    await _discovery!.initialize();
-    _discovery!.eventStream!.listen(_onDiscoveryEvent);
-    await _discovery!.start();
+  /// Re-announces this device under its current name. The broadcast is
+  /// created once from `identity.name` in [start] — if the name changes
+  /// afterwards (onboarding completing, or a future rename), other devices
+  /// keep seeing the old one until this runs, since Bonjour doesn't let us
+  /// edit a live announcement's attributes in place.
+  Future<void> refreshBroadcast() async {
+    await _broadcast?.stop();
+    await _startBroadcast();
   }
 
   Future<void> stop() async {

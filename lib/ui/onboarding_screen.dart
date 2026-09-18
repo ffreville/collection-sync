@@ -25,6 +25,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (!_formKey.currentState!.validate()) return;
     final sync = context.read<SyncService>();
     await sync.identity.setName(_controller.text.trim());
+    await sync.refreshBroadcast();
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const UsersScreen()),
