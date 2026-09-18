@@ -163,6 +163,7 @@ class ItemRepository {
     double? estimatedValue,
     required String state,
     required String notes,
+    required bool owned,
     required Map<String, dynamic> customValues,
   }) async {
     final payload = ItemPayload(
@@ -176,6 +177,7 @@ class ItemRepository {
       estimatedValue: estimatedValue,
       state: state,
       notes: notes,
+      owned: owned,
       customValuesJson: _encodeValues(customValues),
       versionId: const Uuid().v4(),
       updatedByDevice: identity.id,
@@ -194,6 +196,7 @@ class ItemRepository {
     double? estimatedValue,
     required String state,
     required String notes,
+    required bool owned,
     required Map<String, dynamic> customValues,
   }) async {
     _assertOwned(existing.ownerId, identity);
@@ -208,6 +211,7 @@ class ItemRepository {
       estimatedValue: estimatedValue,
       state: state,
       notes: notes,
+      owned: owned,
       customValuesJson: _encodeValues(customValues),
       versionId: const Uuid().v4(),
       parentVersionId: existing.versionId,
@@ -231,6 +235,7 @@ class ItemRepository {
       estimatedValue: existing.estimatedValue,
       state: existing.state,
       notes: existing.notes,
+      owned: existing.owned,
       customValuesJson: existing.customValuesJson,
       versionId: const Uuid().v4(),
       parentVersionId: existing.versionId,

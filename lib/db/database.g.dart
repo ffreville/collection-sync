@@ -1965,6 +1965,19 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _ownedMeta = const VerificationMeta('owned');
+  @override
+  late final GeneratedColumn<bool> owned = GeneratedColumn<bool>(
+    'owned',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("owned" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   static const VerificationMeta _customValuesJsonMeta = const VerificationMeta(
     'customValuesJson',
   );
@@ -1995,6 +2008,7 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     estimatedValue,
     state,
     notes,
+    owned,
     customValuesJson,
   ];
   @override
@@ -2134,6 +2148,12 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
         notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
       );
     }
+    if (data.containsKey('owned')) {
+      context.handle(
+        _ownedMeta,
+        owned.isAcceptableOrUnknown(data['owned']!, _ownedMeta),
+      );
+    }
     if (data.containsKey('custom_values_json')) {
       context.handle(
         _customValuesJsonMeta,
@@ -2216,6 +2236,10 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
         DriftSqlType.string,
         data['${effectivePrefix}notes'],
       )!,
+      owned: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}owned'],
+      )!,
       customValuesJson: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}custom_values_json'],
@@ -2246,6 +2270,11 @@ class Item extends DataClass implements Insertable<Item> {
   final double? estimatedValue;
   final String state;
   final String notes;
+
+  /// Whether you have this item, or just want it — an ordinary want-list
+  /// entry rather than something you actually own. Kept as a real column
+  /// (not a custom field) so every collection gets this distinction for free.
+  final bool owned;
   final String customValuesJson;
   const Item({
     required this.versionId,
@@ -2264,6 +2293,7 @@ class Item extends DataClass implements Insertable<Item> {
     this.estimatedValue,
     required this.state,
     required this.notes,
+    required this.owned,
     required this.customValuesJson,
   });
   @override
@@ -2293,6 +2323,7 @@ class Item extends DataClass implements Insertable<Item> {
     }
     map['state'] = Variable<String>(state);
     map['notes'] = Variable<String>(notes);
+    map['owned'] = Variable<bool>(owned);
     map['custom_values_json'] = Variable<String>(customValuesJson);
     return map;
   }
@@ -2323,6 +2354,7 @@ class Item extends DataClass implements Insertable<Item> {
           : Value(estimatedValue),
       state: Value(state),
       notes: Value(notes),
+      owned: Value(owned),
       customValuesJson: Value(customValuesJson),
     );
   }
@@ -2349,6 +2381,7 @@ class Item extends DataClass implements Insertable<Item> {
       estimatedValue: serializer.fromJson<double?>(json['estimatedValue']),
       state: serializer.fromJson<String>(json['state']),
       notes: serializer.fromJson<String>(json['notes']),
+      owned: serializer.fromJson<bool>(json['owned']),
       customValuesJson: serializer.fromJson<String>(json['customValuesJson']),
     );
   }
@@ -2372,6 +2405,7 @@ class Item extends DataClass implements Insertable<Item> {
       'estimatedValue': serializer.toJson<double?>(estimatedValue),
       'state': serializer.toJson<String>(state),
       'notes': serializer.toJson<String>(notes),
+      'owned': serializer.toJson<bool>(owned),
       'customValuesJson': serializer.toJson<String>(customValuesJson),
     };
   }
@@ -2393,6 +2427,7 @@ class Item extends DataClass implements Insertable<Item> {
     Value<double?> estimatedValue = const Value.absent(),
     String? state,
     String? notes,
+    bool? owned,
     String? customValuesJson,
   }) => Item(
     versionId: versionId ?? this.versionId,
@@ -2417,6 +2452,7 @@ class Item extends DataClass implements Insertable<Item> {
         : this.estimatedValue,
     state: state ?? this.state,
     notes: notes ?? this.notes,
+    owned: owned ?? this.owned,
     customValuesJson: customValuesJson ?? this.customValuesJson,
   );
   Item copyWithCompanion(ItemsCompanion data) {
@@ -2449,6 +2485,7 @@ class Item extends DataClass implements Insertable<Item> {
           : this.estimatedValue,
       state: data.state.present ? data.state.value : this.state,
       notes: data.notes.present ? data.notes.value : this.notes,
+      owned: data.owned.present ? data.owned.value : this.owned,
       customValuesJson: data.customValuesJson.present
           ? data.customValuesJson.value
           : this.customValuesJson,
@@ -2474,6 +2511,7 @@ class Item extends DataClass implements Insertable<Item> {
           ..write('estimatedValue: $estimatedValue, ')
           ..write('state: $state, ')
           ..write('notes: $notes, ')
+          ..write('owned: $owned, ')
           ..write('customValuesJson: $customValuesJson')
           ..write(')'))
         .toString();
@@ -2497,6 +2535,7 @@ class Item extends DataClass implements Insertable<Item> {
     estimatedValue,
     state,
     notes,
+    owned,
     customValuesJson,
   );
   @override
@@ -2519,6 +2558,7 @@ class Item extends DataClass implements Insertable<Item> {
           other.estimatedValue == this.estimatedValue &&
           other.state == this.state &&
           other.notes == this.notes &&
+          other.owned == this.owned &&
           other.customValuesJson == this.customValuesJson);
 }
 
@@ -2539,6 +2579,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
   final Value<double?> estimatedValue;
   final Value<String> state;
   final Value<String> notes;
+  final Value<bool> owned;
   final Value<String> customValuesJson;
   final Value<int> rowid;
   const ItemsCompanion({
@@ -2558,6 +2599,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.estimatedValue = const Value.absent(),
     this.state = const Value.absent(),
     this.notes = const Value.absent(),
+    this.owned = const Value.absent(),
     this.customValuesJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -2578,6 +2620,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.estimatedValue = const Value.absent(),
     this.state = const Value.absent(),
     this.notes = const Value.absent(),
+    this.owned = const Value.absent(),
     this.customValuesJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : versionId = Value(versionId),
@@ -2604,6 +2647,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Expression<double>? estimatedValue,
     Expression<String>? state,
     Expression<String>? notes,
+    Expression<bool>? owned,
     Expression<String>? customValuesJson,
     Expression<int>? rowid,
   }) {
@@ -2624,6 +2668,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       if (estimatedValue != null) 'estimated_value': estimatedValue,
       if (state != null) 'state': state,
       if (notes != null) 'notes': notes,
+      if (owned != null) 'owned': owned,
       if (customValuesJson != null) 'custom_values_json': customValuesJson,
       if (rowid != null) 'rowid': rowid,
     });
@@ -2646,6 +2691,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Value<double?>? estimatedValue,
     Value<String>? state,
     Value<String>? notes,
+    Value<bool>? owned,
     Value<String>? customValuesJson,
     Value<int>? rowid,
   }) {
@@ -2666,6 +2712,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       estimatedValue: estimatedValue ?? this.estimatedValue,
       state: state ?? this.state,
       notes: notes ?? this.notes,
+      owned: owned ?? this.owned,
       customValuesJson: customValuesJson ?? this.customValuesJson,
       rowid: rowid ?? this.rowid,
     );
@@ -2722,6 +2769,9 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
+    if (owned.present) {
+      map['owned'] = Variable<bool>(owned.value);
+    }
     if (customValuesJson.present) {
       map['custom_values_json'] = Variable<String>(customValuesJson.value);
     }
@@ -2750,6 +2800,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
           ..write('estimatedValue: $estimatedValue, ')
           ..write('state: $state, ')
           ..write('notes: $notes, ')
+          ..write('owned: $owned, ')
           ..write('customValuesJson: $customValuesJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -3742,6 +3793,7 @@ typedef $$ItemsTableCreateCompanionBuilder = ItemsCompanion Function({
   Value<double?> estimatedValue,
   Value<String> state,
   Value<String> notes,
+  Value<bool> owned,
   Value<String> customValuesJson,
   Value<int> rowid,
 });
@@ -3762,6 +3814,7 @@ typedef $$ItemsTableUpdateCompanionBuilder = ItemsCompanion Function({
   Value<double?> estimatedValue,
   Value<String> state,
   Value<String> notes,
+  Value<bool> owned,
   Value<String> customValuesJson,
   Value<int> rowid,
 });
@@ -3851,6 +3904,11 @@ class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
 
   ColumnFilters<String> get notes => $composableBuilder(
     column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get owned => $composableBuilder(
+    column: $table.owned,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3949,6 +4007,11 @@ class $$ItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get owned => $composableBuilder(
+    column: $table.owned,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get customValuesJson => $composableBuilder(
     column: $table.customValuesJson,
     builder: (column) => ColumnOrderings(column),
@@ -4024,6 +4087,9 @@ class $$ItemsTableAnnotationComposer
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
 
+  GeneratedColumn<bool> get owned =>
+      $composableBuilder(column: $table.owned, builder: (column) => column);
+
   GeneratedColumn<String> get customValuesJson => $composableBuilder(
     column: $table.customValuesJson,
     builder: (column) => column,
@@ -4074,6 +4140,7 @@ class $$ItemsTableTableManager
                 Value<double?> estimatedValue = const Value.absent(),
                 Value<String> state = const Value.absent(),
                 Value<String> notes = const Value.absent(),
+                Value<bool> owned = const Value.absent(),
                 Value<String> customValuesJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ItemsCompanion(
@@ -4093,6 +4160,7 @@ class $$ItemsTableTableManager
                 estimatedValue: estimatedValue,
                 state: state,
                 notes: notes,
+                owned: owned,
                 customValuesJson: customValuesJson,
                 rowid: rowid,
               ),
@@ -4114,6 +4182,7 @@ class $$ItemsTableTableManager
                 Value<double?> estimatedValue = const Value.absent(),
                 Value<String> state = const Value.absent(),
                 Value<String> notes = const Value.absent(),
+                Value<bool> owned = const Value.absent(),
                 Value<String> customValuesJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ItemsCompanion.insert(
@@ -4133,6 +4202,7 @@ class $$ItemsTableTableManager
                 estimatedValue: estimatedValue,
                 state: state,
                 notes: notes,
+                owned: owned,
                 customValuesJson: customValuesJson,
                 rowid: rowid,
               ),

@@ -36,6 +36,7 @@ class _ItemEditScreenState extends State<ItemEditScreen> {
   String? _category;
   String? _state;
   String? _photoBase64;
+  bool _owned = true;
 
   late Map<String, dynamic> _customValues;
   final Map<String, TextEditingController> _customControllers = {};
@@ -51,6 +52,7 @@ class _ItemEditScreenState extends State<ItemEditScreen> {
     _category = existing != null && existing.category.isNotEmpty ? existing.category : null;
     _state = existing != null && existing.state.isNotEmpty ? existing.state : null;
     _photoBase64 = existing?.photoBase64;
+    _owned = existing?.owned ?? true;
     _customValues = existing != null
         ? Map<String, dynamic>.from(jsonDecode(existing.customValuesJson) as Map)
         : {};
@@ -104,6 +106,25 @@ class _ItemEditScreenState extends State<ItemEditScreen> {
             TextField(
               controller: _nameController,
               decoration: const InputDecoration(labelText: 'Nom'),
+            ),
+            const SizedBox(height: 12),
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(
+                  value: true,
+                  label: Text('Possédé'),
+                  icon: Icon(Icons.check_circle_outline),
+                ),
+                ButtonSegment(
+                  value: false,
+                  label: Text('Souhaité'),
+                  icon: Icon(Icons.star_border),
+                ),
+              ],
+              selected: {_owned},
+              onSelectionChanged: widget.readOnly
+                  ? null
+                  : (selection) => setState(() => _owned = selection.first),
             ),
             const SizedBox(height: 12),
             Row(
@@ -377,6 +398,7 @@ class _ItemEditScreenState extends State<ItemEditScreen> {
         estimatedValue: estimatedValue,
         state: _state ?? '',
         notes: _notesController.text.trim(),
+        owned: _owned,
         customValues: _customValues,
       );
     } else {
@@ -389,6 +411,7 @@ class _ItemEditScreenState extends State<ItemEditScreen> {
         estimatedValue: estimatedValue,
         state: _state ?? '',
         notes: _notesController.text.trim(),
+        owned: _owned,
         customValues: _customValues,
       );
     }

@@ -562,6 +562,7 @@ class SyncService extends ChangeNotifier {
       estimatedValue: chosen.estimatedValue,
       state: chosen.state,
       notes: chosen.notes,
+      owned: chosen.owned,
       customValuesJson: chosen.customValuesJson,
       versionId: const Uuid().v4(),
       parentVersionId: conflict.local.versionId,

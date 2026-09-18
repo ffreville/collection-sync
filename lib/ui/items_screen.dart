@@ -24,6 +24,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
   String _query = '';
   String? _categoryFilter;
   String? _stateFilter;
+  bool? _ownedFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +56,26 @@ class _ItemsScreenState extends State<ItemsScreen> {
               onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SegmentedButton<bool?>(
+                    segments: const [
+                      ButtonSegment(value: null, label: Text('Tous')),
+                      ButtonSegment(value: true, label: Text('Possédés')),
+                      ButtonSegment(value: false, label: Text('Souhaités')),
+                    ],
+                    selected: {_ownedFilter},
+                    onSelectionChanged: (selection) =>
+                        setState(() => _ownedFilter = selection.first),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
           if (schema.categories.isNotEmpty || schema.states.isNotEmpty)
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -95,6 +116,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
                   }
                   if (_categoryFilter != null && item.category != _categoryFilter) return false;
                   if (_stateFilter != null && item.state != _stateFilter) return false;
+                  if (_ownedFilter != null && item.owned != _ownedFilter) return false;
                   return true;
                 }).toList();
 
@@ -142,6 +164,13 @@ class _ItemsScreenState extends State<ItemsScreen> {
                               if (item.category.isNotEmpty) item.category,
                               '×${item.quantity}',
                             ].join(' · ')),
+                            trailing: item.owned
+                                ? null
+                                : Chip(
+                                    avatar: const Icon(Icons.star_border, size: 16),
+                                    label: const Text('Souhaité'),
+                                    visualDensity: VisualDensity.compact,
+                                  ),
                             onTap: () => _open(context, item),
                             onLongPress: widget.isMine ? () => _confirmDelete(context, repo, item) : null,
                           );
@@ -223,8 +252,15 @@ class _ItemGridCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final wanted = !item.owned;
     return Card(
       clipBehavior: Clip.antiAlias,
+      shape: wanted
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: scheme.tertiary, width: 1.5, style: BorderStyle.solid),
+            )
+          : null,
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
@@ -232,13 +268,35 @@ class _ItemGridCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: Container(
-                width: double.infinity,
-                color: scheme.secondaryContainer,
-                alignment: Alignment.center,
-                child: item.photoBase64 != null
-                    ? Image.memory(base64Decode(item.photoBase64!), fit: BoxFit.cover, width: double.infinity)
-                    : Icon(Icons.inventory_2_outlined, color: scheme.secondary, size: 28),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    color: scheme.secondaryContainer,
+                    alignment: Alignment.center,
+                    child: Opacity(
+                      opacity: wanted ? 0.55 : 1,
+                      child: item.photoBase64 != null
+                          ? Image.memory(base64Decode(item.photoBase64!), fit: BoxFit.cover, width: double.infinity)
+                          : Icon(Icons.inventory_2_outlined, color: scheme.secondary, size: 28),
+                    ),
+                  ),
+                  if (wanted)
+                    Positioned(
+                      left: 8,
+                      top: 8,
+                      child: Chip(
+                        avatar: Icon(Icons.star_border, size: 16, color: scheme.onTertiaryContainer),
+                        label: const Text('Souhaité'),
+                        labelStyle: TextStyle(color: scheme.onTertiaryContainer),
+                        backgroundColor: scheme.tertiaryContainer,
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                ],
               ),
             ),
             Padding(

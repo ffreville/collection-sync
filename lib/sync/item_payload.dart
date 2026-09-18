@@ -20,6 +20,7 @@ class ItemPayload implements SyncEntity {
   final double? estimatedValue;
   final String state;
   final String notes;
+  final bool owned;
   final String customValuesJson;
 
   @override
@@ -43,6 +44,7 @@ class ItemPayload implements SyncEntity {
     this.estimatedValue,
     required this.state,
     required this.notes,
+    required this.owned,
     required this.customValuesJson,
     required this.versionId,
     this.parentVersionId,
@@ -63,6 +65,7 @@ class ItemPayload implements SyncEntity {
         estimatedValue: row.estimatedValue,
         state: row.state,
         notes: row.notes,
+        owned: row.owned,
         customValuesJson: row.customValuesJson,
         versionId: row.versionId,
         parentVersionId: row.parentVersionId,
@@ -83,6 +86,7 @@ class ItemPayload implements SyncEntity {
         estimatedValue: (json['estimatedValue'] as num?)?.toDouble(),
         state: json['state'] as String? ?? '',
         notes: json['notes'] as String? ?? '',
+        owned: json['owned'] as bool? ?? true,
         customValuesJson: json['customValuesJson'] as String? ?? '{}',
         versionId: json['versionId'] as String,
         parentVersionId: json['parentVersionId'] as String?,
@@ -107,6 +111,7 @@ class ItemPayload implements SyncEntity {
         'estimatedValue': estimatedValue,
         'state': state,
         'notes': notes,
+        'owned': owned,
         'customValuesJson': customValuesJson,
         'versionId': versionId,
         'parentVersionId': parentVersionId,
@@ -127,6 +132,7 @@ class ItemPayload implements SyncEntity {
         estimatedValue: Value(estimatedValue),
         state: Value(state),
         notes: Value(notes),
+        owned: Value(owned),
         customValuesJson: Value(customValuesJson),
         versionId: versionId,
         parentVersionId: Value(parentVersionId),

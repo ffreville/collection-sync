@@ -88,6 +88,11 @@ class Items extends Table with VersionedColumns {
   TextColumn get state => text().withDefault(const Constant(''))();
   TextColumn get notes => text().withDefault(const Constant(''))();
 
+  /// Whether you have this item, or just want it — an ordinary want-list
+  /// entry rather than something you actually own. Kept as a real column
+  /// (not a custom field) so every collection gets this distinction for free.
+  BoolColumn get owned => boolean().withDefault(const Constant(true))();
+
   TextColumn get customValuesJson =>
       text().withDefault(const Constant('{}'))();
 
