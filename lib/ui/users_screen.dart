@@ -81,7 +81,17 @@ class UsersScreen extends StatelessWidget {
                       ),
                       title: Text(user.name),
                       subtitle: Text(sync.isOnline(user.id) ? 'En ligne' : 'Hors ligne'),
-                      trailing: const Chip(label: Text('Lecture seule')),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Chip(label: Text('Lecture seule')),
+                          IconButton(
+                            tooltip: 'Oublier ce profil',
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () => _forgetUser(context, db, user),
+                          ),
+                        ],
+                      ),
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => UniversesScreen(
@@ -111,6 +121,31 @@ class UsersScreen extends StatelessWidget {
         },
       ),
     );
+  }
+
+  Future<void> _forgetUser(BuildContext context, AppDatabase db, KnownUser user) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Oublier ce profil ?'),
+        content: Text(
+          "${user.name} et tout ce qu'il vous a partagé (univers, collections, "
+          "objets) seront retirés de cet appareil. Vous pourrez de nouveau "
+          'synchroniser avec lui plus tard si besoin.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Oublier'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await db.forgetKnownUser(user.id);
   }
 
   Future<void> _addProfile(BuildContext context, AppDatabase db) async {

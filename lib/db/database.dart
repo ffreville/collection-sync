@@ -167,6 +167,20 @@ class AppDatabase extends _$AppDatabase {
         .watch();
   }
 
+  /// Forgets a remote profile you've synced with: drops the [KnownUsers]
+  /// bookkeeping row and every local copy of content it owns. This is a hard
+  /// local purge, not a synced deletion — you don't own that content, so
+  /// there's no version to bump and nothing is sent to anyone. Syncing with
+  /// that peer again later just re-downloads whatever they still have.
+  Future<void> forgetKnownUser(String userId) {
+    return transaction(() async {
+      await (delete(items)..where((t) => t.ownerId.equals(userId))).go();
+      await (delete(collections)..where((t) => t.ownerId.equals(userId))).go();
+      await (delete(universes)..where((t) => t.ownerId.equals(userId))).go();
+      await (delete(knownUsers)..where((t) => t.id.equals(userId))).go();
+    });
+  }
+
   static QueryExecutor _openConnection() {
     return LazyDatabase(() async {
       final dbFolder = await getApplicationDocumentsDirectory();
