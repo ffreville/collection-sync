@@ -46,8 +46,8 @@ class CollectionsScreen extends StatelessWidget {
               return ListTile(
                 leading: const CircleAvatar(child: Icon(Icons.style_outlined)),
                 title: Text(collection.name),
-                subtitle: FutureBuilder<int>(
-                  future: db.countItemsOf(collection.id),
+                subtitle: StreamBuilder<int>(
+                  stream: db.watchItemCountOf(collection.id),
                   builder: (context, countSnapshot) =>
                       Text('${countSnapshot.data ?? '…'} objets'),
                 ),

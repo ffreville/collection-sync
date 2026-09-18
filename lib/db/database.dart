@@ -108,13 +108,15 @@ class AppDatabase extends _$AppDatabase {
         .watch();
   }
 
-  Future<int> countItemsOf(String collectionId) async {
+  /// A live count, not a one-off `Future` — a `FutureBuilder` version of this
+  /// only re-queries when its widget rebuilds, so it went stale whenever you
+  /// added/removed an item and navigated back to the collections list.
+  Stream<int> watchItemCountOf(String collectionId) {
     final countExp = countAll();
     final query = selectOnly(items)
       ..addColumns([countExp])
       ..where(items.collectionId.equals(collectionId) & items.deleted.equals(false));
-    final row = await query.getSingle();
-    return row.read(countExp) ?? 0;
+    return query.watchSingle().map((row) => row.read(countExp) ?? 0);
   }
 
   Stream<List<Item>> watchItemsOf(String collectionId) {
