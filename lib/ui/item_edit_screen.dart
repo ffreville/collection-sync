@@ -82,6 +82,12 @@ class _ItemEditScreenState extends State<ItemEditScreen> {
       appBar: AppBar(
         title: Text(widget.readOnly ? widget.existing!.name : (isEditing ? "Modifier l'objet" : 'Nouvel objet')),
         actions: [
+          if (!widget.readOnly && isEditing)
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              tooltip: 'Supprimer',
+              onPressed: _delete,
+            ),
           if (!widget.readOnly) TextButton(onPressed: _save, child: const Text('Enregistrer')),
         ],
       ),
@@ -386,6 +392,33 @@ class _ItemEditScreenState extends State<ItemEditScreen> {
         customValues: _customValues,
       );
     }
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _delete() async {
+    final existing = widget.existing;
+    if (existing == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Supprimer cet objet ?'),
+        content: Text(existing.name),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final db = context.read<AppDatabase>();
+    final sync = context.read<SyncService>();
+    await ItemRepository(db: db, identity: sync.identity).delete(existing);
     if (mounted) Navigator.of(context).pop();
   }
 }

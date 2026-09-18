@@ -12,6 +12,7 @@ import 'conflicts.dart';
 import 'device_identity.dart';
 import 'entities.dart';
 import 'item_payload.dart';
+import 'pending_change.dart';
 import 'sync_protocol.dart';
 import 'universe_payload.dart';
 
@@ -63,6 +64,11 @@ class SyncService extends ChangeNotifier {
   final List<ItemConflict> itemConflicts = [];
   int get totalConflicts =>
       universeConflicts.length + collectionConflicts.length + itemConflicts.length;
+
+  /// Changes to a peer's content, proposed by the last sync(s) *you*
+  /// initiated, waiting for you to accept or ignore them — see
+  /// docs/spec-universes-collections.md and PendingChange's doc comment.
+  final List<PendingChange> pendingChanges = [];
 
   SyncService({required this.db, required this.identity});
 
@@ -150,10 +156,13 @@ class SyncService extends ChangeNotifier {
     return ipv4.isNotEmpty ? ipv4.first : addresses.first;
   }
 
+  /// A device that didn't ask for this sync just gets it — everything the
+  /// peer sends applies automatically, exactly like before. Reviewing
+  /// proposed changes (see [pendingChanges]) is only for the initiating side.
   Future<void> _acceptIncoming(Socket socket) async {
     final channel = MessageChannel(socket);
     try {
-      await _runSyncSession(channel);
+      await _runSyncSession(channel, isInitiator: false);
       notifyListeners();
     } catch (e) {
       debugPrint('Sync (incoming) failed: $e');
@@ -190,11 +199,13 @@ class SyncService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final newConflicts = await _runSyncSession(channel);
+      final result = await _runSyncSession(channel, isInitiator: true);
       status = SyncStatus.done;
-      statusMessage = newConflicts == 0
-          ? 'Synchronisation terminée.'
-          : '$newConflicts conflit(s) à résoudre.';
+      final parts = [
+        if (result.newPendingChanges > 0) '${result.newPendingChanges} modification(s) proposée(s)',
+        if (result.newConflicts > 0) '${result.newConflicts} conflit(s) à résoudre',
+      ];
+      statusMessage = parts.isEmpty ? 'Synchronisation terminée.' : parts.join(', ');
     } catch (e) {
       status = SyncStatus.error;
       statusMessage = 'Échec de la synchronisation : $e';
@@ -205,7 +216,7 @@ class SyncService extends ChangeNotifier {
   }
 
   /// The actual protocol. Both sides of the connection run this exact same
-  /// sequence:
+  /// network sequence:
   ///
   ///  1. hello        — exchange device id/name, remember the peer as a
   ///                     known user
@@ -215,8 +226,15 @@ class SyncService extends ChangeNotifier {
   ///  5. done          — small handshake so neither side closes the socket
   ///                      while the other is still writing
   ///
-  /// Returns how many new conflicts this session produced.
-  Future<int> _runSyncSession(MessageChannel channel) async {
+  /// What differs is [isInitiator]: content you don't own that would
+  /// fast-forward is applied immediately when you *accepted* this
+  /// connection, but only *proposed* (added to [pendingChanges], not written
+  /// to the db) when you're the one who asked for this sync — see
+  /// PendingChange's doc comment for why.
+  Future<_SyncSessionResult> _runSyncSession(
+    MessageChannel channel, {
+    required bool isInitiator,
+  }) async {
     final queue = StreamQueue<SyncMessage>(channel.messages);
 
     channel.send(SyncMessage('hello', {
@@ -234,6 +252,7 @@ class SyncService extends ChangeNotifier {
         ));
 
     var newConflicts = 0;
+    var newPendingChanges = 0;
 
     final universeResult = await _syncKind<UniversePayload>(
       channel: channel,
@@ -243,11 +262,27 @@ class SyncService extends ChangeNotifier {
           (await db.select(db.universes).get()).map(UniversePayload.fromRow).toList(),
       decode: UniversePayload.fromJson,
     );
+    final universeNames = <String, String>{
+      for (final u in universeResult.localById.values) u.id: u.name,
+      for (final u in universeResult.incoming) u.id: u.name,
+    };
     for (final remote in universeResult.incoming) {
       final local = universeResult.localById[remote.id];
+      if (local == null && remote.deleted) continue; // nothing to show or apply
       switch (decideMerge(local, remote)) {
         case MergeAction.applied:
-          await db.into(db.universes).insertOnConflictUpdate(remote.toCompanion());
+          Future<void> apply() => db.into(db.universes).insertOnConflictUpdate(remote.toCompanion());
+          if (isInitiator && remote.ownerId != identity.id) {
+            pendingChanges.add(PendingChange(
+              kind: 'universe',
+              action: _classify(local == null, remote.deleted),
+              title: remote.name,
+              applyChange: apply,
+            ));
+            newPendingChanges++;
+          } else {
+            await apply();
+          }
         case MergeAction.conflict:
           universeConflicts.add(UniverseConflict(local: local!, remote: remote));
           newConflicts++;
@@ -264,11 +299,32 @@ class SyncService extends ChangeNotifier {
           (await db.select(db.collections).get()).map(CollectionPayload.fromRow).toList(),
       decode: CollectionPayload.fromJson,
     );
+    final collectionNames = <String, String>{
+      for (final c in collectionResult.localById.values) c.id: c.name,
+      for (final c in collectionResult.incoming) c.id: c.name,
+    };
+    final collectionUniverseId = <String, String>{
+      for (final c in collectionResult.localById.values) c.id: c.universeId,
+      for (final c in collectionResult.incoming) c.id: c.universeId,
+    };
     for (final remote in collectionResult.incoming) {
       final local = collectionResult.localById[remote.id];
+      if (local == null && remote.deleted) continue;
       switch (decideMerge(local, remote)) {
         case MergeAction.applied:
-          await db.into(db.collections).insertOnConflictUpdate(remote.toCompanion());
+          Future<void> apply() => db.into(db.collections).insertOnConflictUpdate(remote.toCompanion());
+          if (isInitiator && remote.ownerId != identity.id) {
+            pendingChanges.add(PendingChange(
+              kind: 'collection',
+              action: _classify(local == null, remote.deleted),
+              title: remote.name,
+              parentLabel: universeNames[remote.universeId],
+              applyChange: apply,
+            ));
+            newPendingChanges++;
+          } else {
+            await apply();
+          }
         case MergeAction.conflict:
           collectionConflicts.add(CollectionConflict(local: local!, remote: remote));
           newConflicts++;
@@ -286,9 +342,24 @@ class SyncService extends ChangeNotifier {
     );
     for (final remote in itemResult.incoming) {
       final local = itemResult.localById[remote.id];
+      if (local == null && remote.deleted) continue;
       switch (decideMerge(local, remote)) {
         case MergeAction.applied:
-          await db.into(db.items).insertOnConflictUpdate(remote.toCompanion());
+          Future<void> apply() => db.into(db.items).insertOnConflictUpdate(remote.toCompanion());
+          if (isInitiator && remote.ownerId != identity.id) {
+            final collectionName = collectionNames[remote.collectionId];
+            final universeName = universeNames[collectionUniverseId[remote.collectionId]];
+            pendingChanges.add(PendingChange(
+              kind: 'item',
+              action: _classify(local == null, remote.deleted),
+              title: remote.name,
+              parentLabel: [?universeName, ?collectionName].join(' / '),
+              applyChange: apply,
+            ));
+            newPendingChanges++;
+          } else {
+            await apply();
+          }
         case MergeAction.conflict:
           itemConflicts.add(ItemConflict(local: local!, remote: remote));
           newConflicts++;
@@ -301,8 +372,11 @@ class SyncService extends ChangeNotifier {
     await queue.next;
     await queue.cancel(immediate: true);
 
-    return newConflicts;
+    return _SyncSessionResult(newConflicts: newConflicts, newPendingChanges: newPendingChanges);
   }
+
+  ChangeAction _classify(bool isCreate, bool isDelete) =>
+      isCreate ? ChangeAction.created : (isDelete ? ChangeAction.deleted : ChangeAction.updated);
 
   /// One manifest/request/items round-trip for a given entity kind. Kept
   /// generic so Universes/Collections/Items don't each need their own copy
@@ -417,10 +491,34 @@ class SyncService extends ChangeNotifier {
     itemConflicts.removeWhere((c) => c.local.id == conflict.local.id);
     notifyListeners();
   }
+
+  /// Applies every currently-selected pending change and drops the rest —
+  /// call once the user has ticked/unticked what they want from the review
+  /// screen. Anything left unselected simply isn't written: since the local
+  /// version hasn't moved, the next sync with that peer offers it again.
+  Future<void> applySelectedPendingChanges() async {
+    for (final change in pendingChanges.where((c) => c.selected)) {
+      await change.applyChange();
+    }
+    pendingChanges.clear();
+    notifyListeners();
+  }
+
+  /// Drops every pending change without applying any of them.
+  void discardPendingChanges() {
+    pendingChanges.clear();
+    notifyListeners();
+  }
 }
 
 class _SyncKindResult<T extends SyncEntity> {
   final Map<String, T> localById;
   final List<T> incoming;
   const _SyncKindResult({required this.localById, required this.incoming});
+}
+
+class _SyncSessionResult {
+  final int newConflicts;
+  final int newPendingChanges;
+  const _SyncSessionResult({required this.newConflicts, required this.newPendingChanges});
 }

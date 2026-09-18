@@ -28,6 +28,14 @@ l'icône/écran de lancement dans [design/collectionsync-icon/](design/collectio
   ont modifié la même entité indépendamment depuis leur dernier point commun,
   l'appli la considère "divergente" et demande à l'utilisateur de choisir
   quelle version garder (`lib/ui/conflict_resolution_screen.dart`).
+- **Qui reçoit quoi automatiquement** : l'appareil qui *accepte* une connexion
+  entrante applique tout ce que l'autre envoie, comme avant. L'appareil qui
+  *lance* la synchro, lui, ne récupère pas automatiquement le contenu de
+  l'autre (qu'il ne possède pas) : ces changements atterrissent dans
+  `SyncService.pendingChanges`, groupés par Univers/Collection, et l'utilisateur
+  choisit lesquels accepter sur `lib/ui/review_changes_screen.dart`. Son propre
+  contenu (celui qu'il possède) continue de partir automatiquement vers l'autre
+  appareil — voir `SyncService._runSyncSession`.
 - **Droits** : chaque Univers (et par héritage ses Collections/Objets)
   appartient à un `ownerId`. On édite librement ce qu'on possède ; le contenu
   reçu d'un autre utilisateur via la synchro s'affiche en lecture seule, et

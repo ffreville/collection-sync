@@ -5,6 +5,7 @@ import '../db/database.dart';
 import '../sync/sync_service.dart';
 import 'conflict_resolution_screen.dart';
 import 'peers_screen.dart';
+import 'review_changes_screen.dart';
 import 'universes_screen.dart';
 
 class UsersScreen extends StatelessWidget {
@@ -19,6 +20,17 @@ class UsersScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Utilisateurs'),
         actions: [
+          if (sync.pendingChanges.isNotEmpty)
+            IconButton(
+              tooltip: '${sync.pendingChanges.length} modification(s) proposée(s)',
+              icon: Badge(
+                label: Text('${sync.pendingChanges.length}'),
+                child: const Icon(Icons.playlist_add_check_outlined),
+              ),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ReviewChangesScreen()),
+              ),
+            ),
           if (sync.totalConflicts > 0)
             IconButton(
               tooltip: '${sync.totalConflicts} conflit(s) à résoudre',

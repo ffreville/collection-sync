@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../sync/sync_service.dart';
 import 'conflict_resolution_screen.dart';
+import 'review_changes_screen.dart';
 
 class PeersScreen extends StatelessWidget {
   const PeersScreen({super.key});
@@ -32,6 +33,18 @@ class PeersScreen extends StatelessWidget {
                     ),
                   Expanded(child: Text(sync.statusMessage!)),
                 ],
+              ),
+            ),
+          if (sync.pendingChanges.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: FilledButton.tonal(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ReviewChangesScreen()),
+                ),
+                child: Text(
+                  'Voir ${sync.pendingChanges.length} modification(s) proposée(s)',
+                ),
               ),
             ),
           if (sync.totalConflicts > 0)

@@ -52,17 +52,34 @@ class CollectionsScreen extends StatelessWidget {
                       Text('${countSnapshot.data ?? '…'} objets'),
                 ),
                 trailing: isMine
-                    ? IconButton(
-                        icon: const Icon(Icons.edit_outlined),
-                        tooltip: 'Modifier la collection',
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => CollectionEditorScreen(
-                              universe: universe,
-                              existing: collection,
+                    ? PopupMenuButton<_CollectionAction>(
+                        onSelected: (action) => switch (action) {
+                          _CollectionAction.edit => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => CollectionEditorScreen(
+                                  universe: universe,
+                                  existing: collection,
+                                ),
+                              ),
+                            ),
+                          _CollectionAction.delete => _confirmDelete(context, repo, collection),
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(
+                            value: _CollectionAction.edit,
+                            child: ListTile(
+                              leading: Icon(Icons.edit_outlined),
+                              title: Text('Modifier'),
                             ),
                           ),
-                        ),
+                          PopupMenuItem(
+                            value: _CollectionAction.delete,
+                            child: ListTile(
+                              leading: Icon(Icons.delete_outline),
+                              title: Text('Supprimer'),
+                            ),
+                          ),
+                        ],
                       )
                     : const Icon(Icons.chevron_right),
                 onTap: () => Navigator.of(context).push(
@@ -70,7 +87,6 @@ class CollectionsScreen extends StatelessWidget {
                     builder: (_) => ItemsScreen(collection: collection, isMine: isMine),
                   ),
                 ),
-                onLongPress: isMine ? () => _confirmDelete(context, repo, collection) : null,
               );
             },
           );
@@ -113,3 +129,5 @@ class CollectionsScreen extends StatelessWidget {
     }
   }
 }
+
+enum _CollectionAction { edit, delete }

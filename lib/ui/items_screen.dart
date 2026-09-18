@@ -122,8 +122,13 @@ class _ItemsScreenState extends State<ItemsScreen> {
                           childAspectRatio: 0.78,
                         ),
                         itemCount: items.length,
-                        itemBuilder: (context, index) =>
-                            _ItemGridCard(item: items[index], onTap: () => _open(context, items[index])),
+                        itemBuilder: (context, index) => _ItemGridCard(
+                          item: items[index],
+                          onTap: () => _open(context, items[index]),
+                          onLongPress: widget.isMine
+                              ? () => _confirmDelete(context, repo, items[index])
+                              : null,
+                        ),
                       )
                     : ListView.separated(
                         itemCount: items.length,
@@ -212,7 +217,8 @@ class _ItemThumb extends StatelessWidget {
 class _ItemGridCard extends StatelessWidget {
   final Item item;
   final VoidCallback onTap;
-  const _ItemGridCard({required this.item, required this.onTap});
+  final VoidCallback? onLongPress;
+  const _ItemGridCard({required this.item, required this.onTap, this.onLongPress});
 
   @override
   Widget build(BuildContext context) {
@@ -221,6 +227,7 @@ class _ItemGridCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

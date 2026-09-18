@@ -64,8 +64,8 @@ class UniversesScreen extends StatelessWidget {
                     builder: (_) => CollectionsScreen(universe: universe, isMine: isMine),
                   ),
                 ),
-                onLongPress: isMine ? () => _confirmDelete(context, repo, universe) : null,
                 onRename: isMine ? () => _renameUniverse(context, repo, universe) : null,
+                onDelete: isMine ? () => _confirmDelete(context, repo, universe) : null,
               );
             },
           );
@@ -160,19 +160,21 @@ class UniversesScreen extends StatelessWidget {
   }
 }
 
+enum _UniverseAction { rename, delete }
+
 class _UniverseTile extends StatelessWidget {
   final Universe universe;
   final bool isMine;
   final VoidCallback onTap;
-  final VoidCallback? onLongPress;
   final VoidCallback? onRename;
+  final VoidCallback? onDelete;
 
   const _UniverseTile({
     required this.universe,
     required this.isMine,
     required this.onTap,
-    this.onLongPress,
     this.onRename,
+    this.onDelete,
   });
 
   @override
@@ -184,7 +186,6 @@ class _UniverseTile extends StatelessWidget {
         children: [
           InkWell(
             onTap: onTap,
-            onLongPress: onLongPress,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -208,18 +209,37 @@ class _UniverseTile extends StatelessWidget {
               ],
             ),
           ),
-          if (onRename != null)
+          if (onRename != null || onDelete != null)
             Positioned(
               top: 6,
               right: 6,
               child: Material(
                 color: scheme.surface.withValues(alpha: 0.85),
                 shape: const CircleBorder(),
-                child: IconButton(
-                  icon: const Icon(Icons.edit_outlined, size: 18),
-                  tooltip: "Renommer l'univers",
-                  onPressed: onRename,
-                  visualDensity: VisualDensity.compact,
+                child: PopupMenuButton<_UniverseAction>(
+                  icon: const Icon(Icons.more_vert, size: 18),
+                  onSelected: (action) => switch (action) {
+                    _UniverseAction.rename => onRename?.call(),
+                    _UniverseAction.delete => onDelete?.call(),
+                  },
+                  itemBuilder: (context) => [
+                    if (onRename != null)
+                      const PopupMenuItem(
+                        value: _UniverseAction.rename,
+                        child: ListTile(
+                          leading: Icon(Icons.edit_outlined),
+                          title: Text('Renommer'),
+                        ),
+                      ),
+                    if (onDelete != null)
+                      const PopupMenuItem(
+                        value: _UniverseAction.delete,
+                        child: ListTile(
+                          leading: Icon(Icons.delete_outline),
+                          title: Text('Supprimer'),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
