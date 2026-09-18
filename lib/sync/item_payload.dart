@@ -10,6 +10,7 @@ class ItemPayload implements SyncEntity {
   @override
   final String id;
   final String collectionId;
+  @override
   final String ownerId;
 
   final String name;

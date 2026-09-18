@@ -1,35 +1,57 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
-/// A stable identity for this device/user: a random id generated once and
-/// kept forever (used to tell "my own edits" from a peer's during sync, and
-/// as the `ownerId` of everything this user creates), and the display name
-/// chosen during onboarding, shown to other users during sync.
+import '../db/database.dart';
+
+/// Two different notions of "who this is", kept deliberately separate:
+///
+///  - [deviceId] is stable for the life of this install — used purely to
+///    recognize "that's my own mDNS broadcast, ignore it" during discovery.
+///    It is never used as content ownership.
+///  - [id] / [name] track whichever local [Profile] is currently *active* —
+///    this is what new content gets tagged with (`ownerId`). A device can
+///    host several profiles (see docs/spec-universes-collections.md); this
+///    class only ever tracks the one you're currently acting as.
 class DeviceIdentity {
-  final String id;
+  final String deviceId;
+  String id;
   String name;
   bool isOnboarded;
 
-  DeviceIdentity._(this.id, this.name, this.isOnboarded);
+  DeviceIdentity._({
+    required this.deviceId,
+    required this.id,
+    required this.name,
+    required this.isOnboarded,
+  });
 
-  static const _idKey = 'device_id';
-  static const _nameKey = 'device_name';
+  static const _deviceIdKey = 'device_id';
+  static const _activeProfileIdKey = 'active_profile_id';
 
   static Future<DeviceIdentity> load() async {
     final prefs = await SharedPreferences.getInstance();
-    var id = prefs.getString(_idKey);
-    if (id == null) {
-      id = const Uuid().v4();
-      await prefs.setString(_idKey, id);
+    var deviceId = prefs.getString(_deviceIdKey);
+    if (deviceId == null) {
+      deviceId = const Uuid().v4();
+      await prefs.setString(_deviceIdKey, deviceId);
     }
-    final storedName = prefs.getString(_nameKey);
-    return DeviceIdentity._(id, storedName ?? 'Moi', storedName != null);
+    // id/name are resolved against the Profiles table right after this by
+    // _AppServices.init() (in main.dart) — it needs the database, which
+    // isn't this class's concern.
+    final activeProfileId = prefs.getString(_activeProfileIdKey);
+    return DeviceIdentity._(
+      deviceId: deviceId,
+      id: activeProfileId ?? '',
+      name: '',
+      isOnboarded: false,
+    );
   }
 
-  Future<void> setName(String newName) async {
-    name = newName;
+  Future<void> setActiveProfile(Profile profile) async {
+    id = profile.id;
+    name = profile.name;
     isOnboarded = true;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_nameKey, newName);
+    await prefs.setString(_activeProfileIdKey, profile.id);
   }
 }

@@ -21,6 +21,22 @@ void _assertOwned(String ownerId, DeviceIdentity identity) {
   if (ownerId != identity.id) throw NotOwnerException();
 }
 
+/// Local profiles hosted on this device — see docs/spec-universes-collections.md.
+/// Unlike the other repositories, there's no ownership check: any of your
+/// own profiles can create another one.
+class ProfileRepository {
+  final AppDatabase db;
+  ProfileRepository({required this.db});
+
+  Future<Profile> create({required String name}) async {
+    final id = const Uuid().v4();
+    await db.into(db.profiles).insert(
+          ProfilesCompanion.insert(id: id, name: name, createdAt: DateTime.now().toUtc()),
+        );
+    return (await db.profileById(id))!;
+  }
+}
+
 class UniverseRepository {
   final AppDatabase db;
   final DeviceIdentity identity;

@@ -7,6 +7,7 @@ class CollectionPayload implements SyncEntity {
   @override
   final String id;
   final String universeId;
+  @override
   final String ownerId;
   final String name;
 

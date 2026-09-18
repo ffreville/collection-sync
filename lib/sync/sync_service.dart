@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:async/async.dart';
@@ -21,7 +22,14 @@ import 'universe_payload.dart';
 const String kServiceType = '_collectionsync._tcp';
 
 /// Bumped if the wire format ever changes in a backwards-incompatible way.
-const int kSchemaVersion = 2;
+const int kSchemaVersion = 3;
+
+/// One profile advertised by a discovered device — see [DiscoveredPeer].
+class DiscoveredProfile {
+  final String id;
+  final String name;
+  const DiscoveredProfile({required this.id, required this.name});
+}
 
 class DiscoveredPeer {
   final String deviceId;
@@ -29,11 +37,19 @@ class DiscoveredPeer {
   final String host;
   final int port;
 
+  /// The local, fully-editable profiles that device is currently hosting —
+  /// parsed from its mDNS announcement (see _startBroadcast). A device can
+  /// host several (docs/spec-universes-collections.md); this is what lets
+  /// the sync screen offer "which profile do you want to sync" rather than
+  /// just "which device".
+  final List<DiscoveredProfile> profiles;
+
   const DiscoveredPeer({
     required this.deviceId,
     required this.deviceName,
     required this.host,
     required this.port,
+    this.profiles = const [],
   });
 }
 
@@ -54,7 +70,11 @@ class SyncService extends ChangeNotifier {
   final Map<String, DiscoveredPeer> _peers = {};
 
   List<DiscoveredPeer> get peers => _peers.values.toList(growable: false);
-  bool isOnline(String userId) => _peers.containsKey(userId);
+
+  /// Whether the given *profile* — not device — is currently reachable on
+  /// the network, i.e. some discovered device is advertising it right now.
+  bool isOnline(String profileId) =>
+      _peers.values.any((peer) => peer.profiles.any((p) => p.id == profileId));
 
   SyncStatus status = SyncStatus.idle;
   String? statusMessage;
@@ -84,26 +104,46 @@ class SyncService extends ChangeNotifier {
     await _discovery!.start();
   }
 
+  /// Announces this device *and every local profile it hosts* — a bare
+  /// device name wouldn't be enough for peers to offer "choose which
+  /// profile to sync" (see DiscoveredPeer.profiles). The list travels as a
+  /// JSON blob in one mDNS TXT attribute, which keeps this to a handful of
+  /// short-named profiles (each TXT string is capped at 255 bytes by the
+  /// mDNS spec) — plenty for a family sharing a device, but a known limit.
   Future<void> _startBroadcast() async {
+    final localProfiles = await db.select(db.profiles).get();
     final service = BonsoirService(
-      name: '${identity.name}-${identity.id.substring(0, 8)}',
+      name: '${identity.name}-${identity.deviceId.substring(0, 8)}',
       type: kServiceType,
       port: _server!.port,
-      attributes: {'deviceId': identity.id, 'deviceName': identity.name},
+      attributes: {
+        'deviceId': identity.deviceId,
+        'profiles': jsonEncode(
+          localProfiles.map((p) => {'id': p.id, 'name': p.name}).toList(),
+        ),
+      },
     );
     _broadcast = BonsoirBroadcast(service: service);
     await _broadcast!.initialize();
     await _broadcast!.start();
   }
 
-  /// Re-announces this device under its current name. The broadcast is
-  /// created once from `identity.name` in [start] — if the name changes
-  /// afterwards (onboarding completing, or a future rename), other devices
-  /// keep seeing the old one until this runs, since Bonjour doesn't let us
-  /// edit a live announcement's attributes in place.
+  /// Re-announces this device with its current profile list. The broadcast
+  /// is created once (in [start]) from whatever profiles existed then — if
+  /// the active profile's name changes, or a profile is added, other
+  /// devices keep seeing the old announcement until this runs, since
+  /// Bonjour doesn't let us edit a live announcement's attributes in place.
   Future<void> refreshBroadcast() async {
     await _broadcast?.stop();
     await _startBroadcast();
+  }
+
+  /// Switches which local profile owns whatever you create from now on, and
+  /// re-announces so peers see the change — see DeviceIdentity's doc comment.
+  Future<void> switchActiveProfile(Profile profile) async {
+    await identity.setActiveProfile(profile);
+    await refreshBroadcast();
+    notifyListeners();
   }
 
   Future<void> stop() async {
@@ -116,7 +156,7 @@ class SyncService extends ChangeNotifier {
     switch (event) {
       case BonsoirDiscoveryServiceFoundEvent():
         final service = event.service;
-        if (service.attributes['deviceId'] == identity.id) {
+        if (service.attributes['deviceId'] == identity.deviceId) {
           return; // that's our own broadcast, ignore it
         }
         service.resolve(_discovery!.serviceResolver);
@@ -135,15 +175,28 @@ class SyncService extends ChangeNotifier {
 
   void _registerResolvedService(BonsoirService service) {
     final deviceId = service.attributes['deviceId'];
-    final deviceName = service.attributes['deviceName'] ?? 'Appareil';
-    if (deviceId == null || deviceId == identity.id) return;
+    if (deviceId == null || deviceId == identity.deviceId) return;
     final host = _pickAddress(service.hostAddresses);
     if (host == null) return;
+
+    final profiles = <DiscoveredProfile>[];
+    final profilesJson = service.attributes['profiles'];
+    if (profilesJson != null) {
+      try {
+        for (final entry in jsonDecode(profilesJson) as List) {
+          profiles.add(DiscoveredProfile(id: entry['id'] as String, name: entry['name'] as String));
+        }
+      } catch (e) {
+        debugPrint('Could not parse profiles from $deviceId\'s announcement: $e');
+      }
+    }
+
     _peers[deviceId] = DiscoveredPeer(
       deviceId: deviceId,
-      deviceName: deviceName,
+      deviceName: profiles.isNotEmpty ? profiles.map((p) => p.name).join(', ') : 'Appareil',
       host: host,
       port: service.port,
+      profiles: profiles,
     );
     notifyListeners();
   }
@@ -171,9 +224,17 @@ class SyncService extends ChangeNotifier {
     }
   }
 
-  Future<void> syncWith(DiscoveredPeer peer) async {
+  /// [focusProfileId] is which of the *peer's* profiles you want to pull
+  /// from — pass the id of one of `peer.profiles`, or leave it null to sync
+  /// without that filter (accepts fast-forwards from every profile the peer
+  /// hosts). Your own content always goes out regardless — see
+  /// docs/spec-universes-collections.md.
+  Future<void> syncWith(DiscoveredPeer peer, {String? focusProfileId}) async {
+    final focusName = focusProfileId == null
+        ? null
+        : peer.profiles.firstWhere((p) => p.id == focusProfileId, orElse: () => const DiscoveredProfile(id: '', name: '')).name;
     status = SyncStatus.connecting;
-    statusMessage = 'Connexion à ${peer.deviceName}...';
+    statusMessage = 'Connexion à ${focusName?.isNotEmpty == true ? focusName : peer.deviceName}...';
     notifyListeners();
 
     Socket socket;
@@ -195,11 +256,12 @@ class SyncService extends ChangeNotifier {
 
     final channel = MessageChannel(socket);
     status = SyncStatus.syncing;
-    statusMessage = 'Synchronisation avec ${peer.deviceName}...';
+    statusMessage = 'Synchronisation avec ${focusName?.isNotEmpty == true ? focusName : peer.deviceName}...';
     notifyListeners();
 
     try {
-      final result = await _runSyncSession(channel, isInitiator: true);
+      final result =
+          await _runSyncSession(channel, isInitiator: true, focusOwnerId: focusProfileId);
       status = SyncStatus.done;
       final parts = [
         if (result.newPendingChanges > 0) '${result.newPendingChanges} modification(s) proposée(s)',
@@ -230,26 +292,31 @@ class SyncService extends ChangeNotifier {
   /// fast-forward is applied immediately when you *accepted* this
   /// connection, but only *proposed* (added to [pendingChanges], not written
   /// to the db) when you're the one who asked for this sync — see
-  /// PendingChange's doc comment for why.
+  /// PendingChange's doc comment for why. [focusOwnerId], initiator-only,
+  /// additionally limits *which* foreign profile's changes are even
+  /// requested — see [syncWith].
   Future<_SyncSessionResult> _runSyncSession(
     MessageChannel channel, {
     required bool isInitiator,
+    String? focusOwnerId,
   }) async {
     final queue = StreamQueue<SyncMessage>(channel.messages);
 
+    final localProfiles = await db.select(db.profiles).get();
     channel.send(SyncMessage('hello', {
-      'deviceId': identity.id,
-      'deviceName': identity.name,
+      'deviceId': identity.deviceId,
+      'profiles': localProfiles.map((p) => {'id': p.id, 'name': p.name}).toList(),
       'schemaVersion': kSchemaVersion,
     }));
     final hello = await queue.next;
-    final peerId = hello.payload['deviceId'] as String;
-    final peerName = hello.payload['deviceName'] as String? ?? 'Appareil';
-    await db.into(db.knownUsers).insertOnConflictUpdate(KnownUsersCompanion.insert(
-          id: peerId,
-          name: peerName,
-          lastSyncedAt: DateTime.now().toUtc(),
-        ));
+    final remoteProfiles = (hello.payload['profiles'] as List).cast<Map<String, dynamic>>();
+    for (final p in remoteProfiles) {
+      await db.into(db.knownUsers).insertOnConflictUpdate(KnownUsersCompanion.insert(
+            id: p['id'] as String,
+            name: p['name'] as String,
+            lastSyncedAt: DateTime.now().toUtc(),
+          ));
+    }
 
     var newConflicts = 0;
     var newPendingChanges = 0;
@@ -258,6 +325,7 @@ class SyncService extends ChangeNotifier {
       channel: channel,
       queue: queue,
       kind: 'universe',
+      focusOwnerId: isInitiator ? focusOwnerId : null,
       loadLocal: () async =>
           (await db.select(db.universes).get()).map(UniversePayload.fromRow).toList(),
       decode: UniversePayload.fromJson,
@@ -295,6 +363,7 @@ class SyncService extends ChangeNotifier {
       channel: channel,
       queue: queue,
       kind: 'collection',
+      focusOwnerId: isInitiator ? focusOwnerId : null,
       loadLocal: () async =>
           (await db.select(db.collections).get()).map(CollectionPayload.fromRow).toList(),
       decode: CollectionPayload.fromJson,
@@ -337,6 +406,7 @@ class SyncService extends ChangeNotifier {
       channel: channel,
       queue: queue,
       kind: 'item',
+      focusOwnerId: isInitiator ? focusOwnerId : null,
       loadLocal: () async => (await db.select(db.items).get()).map(ItemPayload.fromRow).toList(),
       decode: ItemPayload.fromJson,
     );
@@ -381,18 +451,27 @@ class SyncService extends ChangeNotifier {
   /// One manifest/request/items round-trip for a given entity kind. Kept
   /// generic so Universes/Collections/Items don't each need their own copy
   /// of this network exchange — only how to load/decode them differs.
+  ///
+  /// [focusOwnerId], when set, only requests entries owned by *you* or by
+  /// that profile — everything else the peer's manifest lists is left
+  /// alone this session. This only ever narrows what *this side* asks for;
+  /// the peer's own request (their side of this same exchange) is
+  /// unaffected — see [syncWith].
   Future<_SyncKindResult<T>> _syncKind<T extends SyncEntity>({
     required MessageChannel channel,
     required StreamQueue<SyncMessage> queue,
     required String kind,
     required Future<List<T>> Function() loadLocal,
     required T Function(Map<String, dynamic>) decode,
+    String? focusOwnerId,
   }) async {
     final localList = await loadLocal();
     final localById = {for (final e in localList) e.id: e};
 
     channel.send(SyncMessage('${kind}_manifest', {
-      'entries': localList.map((e) => {'id': e.id, 'versionId': e.versionId}).toList(),
+      'entries': localList
+          .map((e) => {'id': e.id, 'versionId': e.versionId, 'ownerId': e.ownerId})
+          .toList(),
     }));
     final manifestMsg = await queue.next;
     final remoteEntries =
@@ -402,6 +481,10 @@ class SyncService extends ChangeNotifier {
     for (final entry in remoteEntries) {
       final id = entry['id'] as String;
       final versionId = entry['versionId'] as String;
+      final ownerId = entry['ownerId'] as String;
+      if (focusOwnerId != null && ownerId != identity.id && ownerId != focusOwnerId) {
+        continue; // not interested in this profile's changes this session
+      }
       final local = localById[id];
       if (local == null || local.versionId != versionId) wanted.add(id);
     }

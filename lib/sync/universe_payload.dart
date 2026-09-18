@@ -6,6 +6,7 @@ import 'entities.dart';
 class UniversePayload implements SyncEntity {
   @override
   final String id;
+  @override
   final String ownerId;
   final String name;
   @override

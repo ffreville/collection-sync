@@ -76,23 +76,58 @@ class PeersScreen extends StatelessWidget {
                   )
                 : ListView(
                     children: sync.peers
-                        .map((peer) => ListTile(
-                              leading: const Icon(Icons.phone_iphone),
-                              title: Text(peer.deviceName),
-                              subtitle: Text('${peer.host}:${peer.port}'),
-                              trailing: FilledButton(
-                                onPressed:
-                                    sync.status == SyncStatus.connecting ||
-                                            sync.status == SyncStatus.syncing
-                                        ? null
-                                        : () => sync.syncWith(peer),
-                                child: const Text('Synchroniser'),
-                              ),
-                            ))
+                        .map((peer) => _PeerCard(peer: peer, sync: sync))
                         .toList(),
                   ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A discovered device, expanded into one row per profile it hosts — each
+/// with its own sync button, so you can pick which of its profiles to pull
+/// from instead of syncing "the device" as a whole. See
+/// [SyncService.syncWith]'s `focusProfileId`.
+class _PeerCard extends StatelessWidget {
+  final DiscoveredPeer peer;
+  final SyncService sync;
+  const _PeerCard({required this.peer, required this.sync});
+
+  @override
+  Widget build(BuildContext context) {
+    final busy = sync.status == SyncStatus.connecting || sync.status == SyncStatus.syncing;
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.phone_iphone),
+              title: Text(peer.deviceName),
+              subtitle: Text('${peer.host}:${peer.port}'),
+              trailing: FilledButton(
+                onPressed: busy ? null : () => sync.syncWith(peer),
+                child: const Text('Tout synchroniser'),
+              ),
+            ),
+            if (peer.profiles.isNotEmpty) const Divider(height: 1),
+            for (final profile in peer.profiles)
+              ListTile(
+                dense: true,
+                contentPadding: const EdgeInsets.only(left: 32, right: 16),
+                leading: const Icon(Icons.person_outline),
+                title: Text(profile.name),
+                trailing: OutlinedButton(
+                  onPressed: busy ? null : () => sync.syncWith(peer, focusProfileId: profile.id),
+                  child: const Text('Synchroniser'),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

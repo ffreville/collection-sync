@@ -7,13 +7,29 @@ import 'package:path_provider/path_provider.dart';
 
 part 'database.g.dart';
 
-/// Other identities (people) this device has synced with at least once.
-/// "Me" is not a row here — see lib/sync/device_identity.dart. Not versioned:
-/// this is local bookkeeping about peers, not content that gets merged.
+/// Other people's profiles this device has synced with at least once — one
+/// row per remote *profile* (not per device: a device can host several, see
+/// [Profiles]). Not versioned: this is local bookkeeping about who we've
+/// seen, not content that gets merged.
 class KnownUsers extends Table {
-  TextColumn get id => text()(); // their DeviceIdentity.id
+  TextColumn get id => text()(); // their Profile.id
   TextColumn get name => text()();
   DateTimeColumn get lastSyncedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// A local, fully read/write identity hosted on this device — see
+/// docs/spec-universes-collections.md. A device can host several (e.g. one
+/// per family member sharing a tablet); whichever is "active" (tracked by
+/// DeviceIdentity, not stored here) owns whatever you create right now, but
+/// every profile listed here stays fully editable regardless of which one is
+/// active — switching is just about where *new* content goes.
+class Profiles extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  DateTimeColumn get createdAt => dateTime()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -79,7 +95,7 @@ class Items extends Table with VersionedColumns {
   Set<Column> get primaryKey => {id};
 }
 
-@DriftDatabase(tables: [KnownUsers, Universes, Collections, Items])
+@DriftDatabase(tables: [KnownUsers, Profiles, Universes, Collections, Items])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting(super.executor);
@@ -92,6 +108,15 @@ class AppDatabase extends _$AppDatabase {
           ..orderBy([(t) => OrderingTerm(expression: t.name)]))
         .watch();
   }
+
+  Stream<List<Profile>> watchProfiles() {
+    return (select(profiles)
+          ..orderBy([(t) => OrderingTerm(expression: t.createdAt)]))
+        .watch();
+  }
+
+  Future<Profile?> profileById(String id) =>
+      (select(profiles)..where((t) => t.id.equals(id))).getSingleOrNull();
 
   Stream<List<Universe>> watchUniversesOf(String ownerId) {
     return (select(universes)

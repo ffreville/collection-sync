@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../db/database.dart';
+import '../sync/repositories.dart';
 import '../sync/sync_service.dart';
 import 'conflict_resolution_screen.dart';
 import 'peers_screen.dart';
@@ -53,66 +54,129 @@ class UsersScreen extends StatelessWidget {
       ),
       body: StreamBuilder<List<KnownUser>>(
         stream: db.watchKnownUsers(),
-        builder: (context, snapshot) {
-          final knownUsers = snapshot.data ?? const [];
-          return ListView(
-            children: [
-              const _SectionLabel('Vous'),
-              ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  child: Text(
-                    sync.identity.name.isEmpty ? '?' : sync.identity.name[0].toUpperCase(),
-                    style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
-                  ),
-                ),
-                title: Text(sync.identity.name),
-                subtitle: const Text('Accès complet'),
-                trailing: Chip(label: const Text('Vous')),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => UniversesScreen(
-                      ownerId: sync.identity.id,
-                      ownerName: sync.identity.name,
-                      isMine: true,
+        builder: (context, knownSnapshot) {
+          final knownUsers = knownSnapshot.data ?? const [];
+          return StreamBuilder<List<Profile>>(
+            stream: db.watchProfiles(),
+            builder: (context, profileSnapshot) {
+              final profiles = profileSnapshot.data ?? const [];
+              return ListView(
+                children: [
+                  const _SectionLabel('Vos profils'),
+                  for (final profile in profiles)
+                    _ProfileTile(profile: profile, sync: sync),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: OutlinedButton.icon(
+                      onPressed: () => _addProfile(context, db),
+                      icon: const Icon(Icons.person_add_alt_1_outlined),
+                      label: const Text('Ajouter un profil'),
                     ),
                   ),
-                ),
-              ),
-              if (knownUsers.isNotEmpty) const _SectionLabel('Synchronisé avec vous'),
-              for (final user in knownUsers)
-                ListTile(
-                  leading: CircleAvatar(
-                    child: Text(user.name.isEmpty ? '?' : user.name[0].toUpperCase()),
-                  ),
-                  title: Text(user.name),
-                  subtitle: Text(sync.isOnline(user.id) ? 'En ligne' : 'Hors ligne'),
-                  trailing: const Chip(label: Text('Lecture seule')),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => UniversesScreen(
-                        ownerId: user.id,
-                        ownerName: user.name,
-                        isMine: false,
+                  if (knownUsers.isNotEmpty) const _SectionLabel('Synchronisé avec vous'),
+                  for (final user in knownUsers)
+                    ListTile(
+                      leading: CircleAvatar(
+                        child: Text(user.name.isEmpty ? '?' : user.name[0].toUpperCase()),
+                      ),
+                      title: Text(user.name),
+                      subtitle: Text(sync.isOnline(user.id) ? 'En ligne' : 'Hors ligne'),
+                      trailing: const Chip(label: Text('Lecture seule')),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => UniversesScreen(
+                            ownerId: user.id,
+                            ownerName: user.name,
+                            isMine: false,
+                          ),
+                        ),
                       ),
                     ),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const PeersScreen()),
+                      ),
+                      icon: const Icon(Icons.sync),
+                      label: const Text('Synchroniser un nouvel appareil'),
+                    ),
                   ),
-                ),
-              const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: OutlinedButton.icon(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const PeersScreen()),
-                  ),
-                  icon: const Icon(Icons.sync),
-                  label: const Text('Synchroniser un nouvel appareil'),
-                ),
-              ),
-              const SizedBox(height: 24),
-            ],
+                  const SizedBox(height: 24),
+                ],
+              );
+            },
           );
         },
+      ),
+    );
+  }
+
+  Future<void> _addProfile(BuildContext context, AppDatabase db) async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Nouveau profil'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Ex. Camille'),
+          onSubmitted: (v) => Navigator.of(context).pop(v.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Créer'),
+          ),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty) return;
+    await ProfileRepository(db: db).create(name: name);
+  }
+}
+
+class _ProfileTile extends StatelessWidget {
+  final Profile profile;
+  final SyncService sync;
+  const _ProfileTile({required this.profile, required this.sync});
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = profile.id == sync.identity.id;
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundColor:
+            isActive ? Theme.of(context).colorScheme.primary : null,
+        child: Text(
+          profile.name.isEmpty ? '?' : profile.name[0].toUpperCase(),
+          style: isActive
+              ? TextStyle(color: Theme.of(context).colorScheme.onPrimary)
+              : null,
+        ),
+      ),
+      title: Text(profile.name),
+      subtitle: Text(isActive ? 'Actif sur cet appareil' : 'Accès complet'),
+      trailing: isActive
+          ? const Chip(label: Text('Actif'))
+          : TextButton(
+              onPressed: () => sync.switchActiveProfile(profile),
+              child: const Text('Activer'),
+            ),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => UniversesScreen(
+            ownerId: profile.id,
+            ownerName: profile.name,
+            isMine: isActive,
+          ),
+        ),
       ),
     );
   }

@@ -5,6 +5,7 @@
 /// ever talking to a server.
 abstract class SyncEntity {
   String get id;
+  String get ownerId;
   String get versionId;
   String? get parentVersionId;
   String? get parentVersionId2;

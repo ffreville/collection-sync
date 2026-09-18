@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../db/database.dart';
+import '../sync/repositories.dart';
 import '../sync/sync_service.dart';
 import 'users_screen.dart';
 
@@ -24,8 +26,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Future<void> _continue() async {
     if (!_formKey.currentState!.validate()) return;
     final sync = context.read<SyncService>();
-    await sync.identity.setName(_controller.text.trim());
-    await sync.refreshBroadcast();
+    final db = context.read<AppDatabase>();
+    final profile = await ProfileRepository(db: db).create(
+      name: _controller.text.trim(),
+    );
+    await sync.switchActiveProfile(profile);
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const UsersScreen()),

@@ -63,6 +63,12 @@ class _AppServices {
   static Future<_AppServices> init() async {
     final db = AppDatabase();
     final identity = await DeviceIdentity.load();
+    if (identity.id.isNotEmpty) {
+      final profile = await db.profileById(identity.id);
+      if (profile != null) {
+        await identity.setActiveProfile(profile);
+      }
+    }
     final sync = SyncService(db: db, identity: identity);
     await sync.start();
     return _AppServices(db, sync);
