@@ -5,6 +5,7 @@ import '../db/database.dart';
 import '../sync/repositories.dart';
 import '../sync/sync_service.dart';
 import 'conflict_resolution_screen.dart';
+import 'global_search_screen.dart';
 import 'peers_screen.dart';
 import 'review_changes_screen.dart';
 import 'universes_screen.dart';
@@ -21,6 +22,13 @@ class UsersScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Utilisateurs'),
         actions: [
+          IconButton(
+            tooltip: 'Rechercher un objet',
+            icon: const Icon(Icons.search),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const GlobalSearchScreen()),
+            ),
+          ),
           if (sync.pendingChanges.isNotEmpty)
             IconButton(
               tooltip: '${sync.pendingChanges.length} modification(s) proposée(s)',

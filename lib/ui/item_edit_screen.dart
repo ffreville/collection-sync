@@ -35,7 +35,7 @@ class _ItemEditScreenState extends State<ItemEditScreen> {
   late final TextEditingController _notesController;
   String? _category;
   String? _state;
-  String? _photoBase64;
+  late List<String> _photos;
   bool _owned = true;
 
   late Map<String, dynamic> _customValues;
@@ -51,7 +51,7 @@ class _ItemEditScreenState extends State<ItemEditScreen> {
     _notesController = TextEditingController(text: existing?.notes ?? '');
     _category = existing != null && existing.category.isNotEmpty ? existing.category : null;
     _state = existing != null && existing.state.isNotEmpty ? existing.state : null;
-    _photoBase64 = existing?.photoBase64;
+    _photos = existing != null ? List.of(existing.photos) : [];
     _owned = existing?.owned ?? true;
     _customValues = existing != null
         ? Map<String, dynamic>.from(jsonDecode(existing.customValuesJson) as Map)
@@ -98,9 +98,11 @@ class _ItemEditScreenState extends State<ItemEditScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            _PhotoPicker(
-              base64: _photoBase64,
-              onPick: widget.readOnly ? null : _pickPhoto,
+            _PhotoGallery(
+              photos: _photos,
+              readOnly: widget.readOnly,
+              onAdd: _addPhoto,
+              onRemove: (index) => setState(() => _photos.removeAt(index)),
             ),
             const SizedBox(height: 16),
             TextField(
@@ -350,9 +352,9 @@ class _ItemEditScreenState extends State<ItemEditScreen> {
     return base64Encode(bytes);
   }
 
-  Future<void> _pickPhoto() async {
+  Future<void> _addPhoto() async {
     final b64 = await _pickImageBase64();
-    if (b64 != null) setState(() => _photoBase64 = b64);
+    if (b64 != null) setState(() => _photos.add(b64));
   }
 
   String _formatDate(DateTime date) =>
@@ -393,12 +395,12 @@ class _ItemEditScreenState extends State<ItemEditScreen> {
         collection: widget.collection,
         name: name,
         category: _category ?? '',
-        photoBase64: _photoBase64,
         quantity: quantity,
         estimatedValue: estimatedValue,
         state: _state ?? '',
         notes: _notesController.text.trim(),
         owned: _owned,
+        photos: _photos,
         customValues: _customValues,
       );
     } else {
@@ -406,12 +408,12 @@ class _ItemEditScreenState extends State<ItemEditScreen> {
         existing,
         name: name,
         category: _category ?? '',
-        photoBase64: _photoBase64,
         quantity: quantity,
         estimatedValue: estimatedValue,
         state: _state ?? '',
         notes: _notesController.text.trim(),
         owned: _owned,
+        photos: _photos,
         customValues: _customValues,
       );
     }
@@ -443,6 +445,95 @@ class _ItemEditScreenState extends State<ItemEditScreen> {
     final sync = context.read<SyncService>();
     await ItemRepository(db: db, identity: sync.identity).delete(existing);
     if (mounted) Navigator.of(context).pop();
+  }
+}
+
+/// The item's own photo gallery (as opposed to `_PhotoPicker`, used for a
+/// single custom photo field): a horizontal strip of thumbnails plus an
+/// "add" tile. The first photo is the cover shown in grid/list views.
+class _PhotoGallery extends StatelessWidget {
+  final List<String> photos;
+  final bool readOnly;
+  final VoidCallback onAdd;
+  final void Function(int index) onRemove;
+
+  const _PhotoGallery({
+    required this.photos,
+    required this.readOnly,
+    required this.onAdd,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    if (photos.isEmpty && readOnly) {
+      return Container(
+        height: 140,
+        decoration: BoxDecoration(
+          color: scheme.secondaryContainer,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        alignment: Alignment.center,
+        child: Icon(Icons.image_not_supported_outlined, color: scheme.secondary),
+      );
+    }
+    return SizedBox(
+      height: 140,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          for (var i = 0; i < photos.length; i++)
+            Padding(
+              padding: const EdgeInsets.only(right: 10),
+              child: Stack(
+                children: [
+                  Container(
+                    width: 140,
+                    height: 140,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      image: DecorationImage(
+                        image: MemoryImage(base64Decode(photos[i])),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                  if (!readOnly)
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: InkWell(
+                        onTap: () => onRemove(i),
+                        borderRadius: BorderRadius.circular(16),
+                        child: const CircleAvatar(
+                          radius: 14,
+                          backgroundColor: Colors.black54,
+                          child: Icon(Icons.close, size: 16, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          if (!readOnly)
+            InkWell(
+              onTap: onAdd,
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                width: 140,
+                height: 140,
+                decoration: BoxDecoration(
+                  color: scheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                alignment: Alignment.center,
+                child: Icon(Icons.add_a_photo_outlined, color: scheme.secondary),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
 

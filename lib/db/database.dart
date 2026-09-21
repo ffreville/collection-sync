@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
@@ -82,7 +83,13 @@ class Items extends Table with VersionedColumns {
 
   TextColumn get name => text()();
   TextColumn get category => text().withDefault(const Constant(''))();
+
+  /// Deprecated: the single-photo predecessor of [photosJson], kept only so
+  /// the schemaVersion-3 migration has somewhere to read the old value from.
+  /// Nothing writes to this column anymore — see [photosJson] and the
+  /// [ItemPhotos] extension below.
   TextColumn get photoBase64 => text().nullable()();
+
   IntColumn get quantity => integer().withDefault(const Constant(1))();
   RealColumn get estimatedValue => real().nullable()();
   TextColumn get state => text().withDefault(const Constant(''))();
@@ -93,11 +100,49 @@ class Items extends Table with VersionedColumns {
   /// (not a custom field) so every collection gets this distinction for free.
   BoolColumn get owned => boolean().withDefault(const Constant(true))();
 
+  /// JSON array of base64-encoded photos — an item can carry a small gallery
+  /// rather than a single cover photo. The first entry is used as the cover
+  /// thumbnail wherever only one image fits (grid/list views).
+  TextColumn get photosJson => text().withDefault(const Constant('[]'))();
+
   TextColumn get customValuesJson =>
       text().withDefault(const Constant('{}'))();
 
   @override
   Set<Column> get primaryKey => {id};
+}
+
+extension ItemPhotos on Item {
+  List<String> get photos {
+    if (photosJson.isEmpty) return const [];
+    try {
+      return (jsonDecode(photosJson) as List).cast<String>();
+    } catch (_) {
+      return const [];
+    }
+  }
+}
+
+/// Estimated value of a set of items, split by [Items.owned] — see
+/// [AppDatabase.watchCollectionValueOf] / [AppDatabase.watchUniverseValueOf].
+class ValueSummary {
+  final double ownedTotal;
+  final double wantedTotal;
+  const ValueSummary({this.ownedTotal = 0, this.wantedTotal = 0});
+}
+
+/// One hit from [AppDatabase.watchAllItems] — an item plus enough of its
+/// parent chain (whole [Collection], to build its [CollectionSchema]; just
+/// the universe's name) to render and open it from a flat search result.
+class ItemSearchResult {
+  final Item item;
+  final Collection collection;
+  final String universeName;
+  const ItemSearchResult({
+    required this.item,
+    required this.collection,
+    required this.universeName,
+  });
 }
 
 @DriftDatabase(tables: [KnownUsers, Profiles, Universes, Collections, Items])
@@ -106,7 +151,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -114,6 +159,16 @@ class AppDatabase extends _$AppDatabase {
           if (from < 2) {
             await m.createTable(profiles);
             await m.addColumn(items, items.owned);
+          }
+          if (from < 3) {
+            await m.addColumn(items, items.photosJson);
+            final withLegacyPhoto =
+                await (select(items)..where((t) => t.photoBase64.isNotNull())).get();
+            for (final row in withLegacyPhoto) {
+              await (update(items)..where((t) => t.id.equals(row.id))).write(
+                ItemsCompanion(photosJson: Value(jsonEncode([row.photoBase64]))),
+              );
+            }
           }
         },
       );
@@ -159,12 +214,72 @@ class AppDatabase extends _$AppDatabase {
     return query.watchSingle().map((row) => row.read(countExp) ?? 0);
   }
 
+  /// Estimated value held in a collection or universe, split by [Items.owned]
+  /// — e.g. "350 € possédés, 120 € souhaités" rather than one opaque total.
+  Stream<ValueSummary> watchCollectionValueOf(String collectionId) {
+    final valueSum = items.estimatedValue.sum();
+    final query = selectOnly(items)
+      ..addColumns([items.owned, valueSum])
+      ..where(items.collectionId.equals(collectionId) & items.deleted.equals(false))
+      ..groupBy([items.owned]);
+    return query.watch().map(_readValueSummary);
+  }
+
+  Stream<ValueSummary> watchUniverseValueOf(String universeId) {
+    final valueSum = items.estimatedValue.sum();
+    final query = selectOnly(items)
+      ..addColumns([items.owned, valueSum])
+      ..join([innerJoin(collections, collections.id.equalsExp(items.collectionId))])
+      ..where(collections.universeId.equals(universeId) &
+          items.deleted.equals(false) &
+          collections.deleted.equals(false))
+      ..groupBy([items.owned]);
+    return query.watch().map(_readValueSummary);
+  }
+
+  ValueSummary _readValueSummary(List<TypedResult> rows) {
+    var ownedTotal = 0.0;
+    var wantedTotal = 0.0;
+    for (final row in rows) {
+      final owned = row.read(items.owned) ?? true;
+      final sum = row.read(items.estimatedValue.sum()) ?? 0;
+      if (owned) {
+        ownedTotal = sum;
+      } else {
+        wantedTotal = sum;
+      }
+    }
+    return ValueSummary(ownedTotal: ownedTotal, wantedTotal: wantedTotal);
+  }
+
   Stream<List<Item>> watchItemsOf(String collectionId) {
     return (select(items)
           ..where(
               (t) => t.collectionId.equals(collectionId) & t.deleted.equals(false))
           ..orderBy([(t) => OrderingTerm(expression: t.name)]))
         .watch();
+  }
+
+  /// Every non-deleted item across every universe/collection you can see —
+  /// yours and whatever's been synced to you — for the global search screen.
+  /// Filtering by the query text happens client-side (same pattern as the
+  /// per-collection search), this just avoids a per-keystroke SQL query.
+  Stream<List<ItemSearchResult>> watchAllItems() {
+    final query = select(items).join([
+      innerJoin(collections, collections.id.equalsExp(items.collectionId)),
+      innerJoin(universes, universes.id.equalsExp(collections.universeId)),
+    ])
+      ..where(items.deleted.equals(false) &
+          collections.deleted.equals(false) &
+          universes.deleted.equals(false));
+    return query.watch().map((rows) => [
+          for (final row in rows)
+            ItemSearchResult(
+              item: row.readTable(items),
+              collection: row.readTable(collections),
+              universeName: row.readTable(universes).name,
+            ),
+        ]);
   }
 
   /// Forgets a remote profile you've synced with: drops the [KnownUsers]

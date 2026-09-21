@@ -15,12 +15,12 @@ class ItemPayload implements SyncEntity {
 
   final String name;
   final String category;
-  final String? photoBase64;
   final int quantity;
   final double? estimatedValue;
   final String state;
   final String notes;
   final bool owned;
+  final String photosJson;
   final String customValuesJson;
 
   @override
@@ -39,12 +39,12 @@ class ItemPayload implements SyncEntity {
     required this.ownerId,
     required this.name,
     required this.category,
-    this.photoBase64,
     required this.quantity,
     this.estimatedValue,
     required this.state,
     required this.notes,
     required this.owned,
+    required this.photosJson,
     required this.customValuesJson,
     required this.versionId,
     this.parentVersionId,
@@ -60,12 +60,12 @@ class ItemPayload implements SyncEntity {
         ownerId: row.ownerId,
         name: row.name,
         category: row.category,
-        photoBase64: row.photoBase64,
         quantity: row.quantity,
         estimatedValue: row.estimatedValue,
         state: row.state,
         notes: row.notes,
         owned: row.owned,
+        photosJson: row.photosJson,
         customValuesJson: row.customValuesJson,
         versionId: row.versionId,
         parentVersionId: row.parentVersionId,
@@ -81,12 +81,12 @@ class ItemPayload implements SyncEntity {
         ownerId: json['ownerId'] as String,
         name: json['name'] as String,
         category: json['category'] as String? ?? '',
-        photoBase64: json['photoBase64'] as String?,
         quantity: json['quantity'] as int? ?? 1,
         estimatedValue: (json['estimatedValue'] as num?)?.toDouble(),
         state: json['state'] as String? ?? '',
         notes: json['notes'] as String? ?? '',
         owned: json['owned'] as bool? ?? true,
+        photosJson: json['photosJson'] as String? ?? '[]',
         customValuesJson: json['customValuesJson'] as String? ?? '{}',
         versionId: json['versionId'] as String,
         parentVersionId: json['parentVersionId'] as String?,
@@ -106,12 +106,12 @@ class ItemPayload implements SyncEntity {
         'ownerId': ownerId,
         'name': name,
         'category': category,
-        'photoBase64': photoBase64,
         'quantity': quantity,
         'estimatedValue': estimatedValue,
         'state': state,
         'notes': notes,
         'owned': owned,
+        'photosJson': photosJson,
         'customValuesJson': customValuesJson,
         'versionId': versionId,
         'parentVersionId': parentVersionId,
@@ -127,12 +127,12 @@ class ItemPayload implements SyncEntity {
         ownerId: ownerId,
         name: name,
         category: Value(category),
-        photoBase64: Value(photoBase64),
         quantity: Value(quantity),
         estimatedValue: Value(estimatedValue),
         state: Value(state),
         notes: Value(notes),
         owned: Value(owned),
+        photosJson: Value(photosJson),
         customValuesJson: Value(customValuesJson),
         versionId: versionId,
         parentVersionId: Value(parentVersionId),

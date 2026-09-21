@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../db/database.dart';
 import '../sync/repositories.dart';
 import '../sync/sync_service.dart';
+import '../utils/format.dart';
 import 'collections_screen.dart';
 
 class UniversesScreen extends StatelessWidget {
@@ -199,11 +200,28 @@ class _UniverseTile extends StatelessWidget {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
                   child: Text(
                     universe.name,
                     style: Theme.of(context).textTheme.titleSmall,
                     overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                  child: StreamBuilder<ValueSummary>(
+                    stream: context.read<AppDatabase>().watchUniverseValueOf(universe.id),
+                    builder: (context, snapshot) {
+                      final owned = snapshot.data?.ownedTotal ?? 0;
+                      if (owned <= 0) return const SizedBox(height: 14);
+                      return Text(
+                        formatCurrency(owned),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                        overflow: TextOverflow.ellipsis,
+                      );
+                    },
                   ),
                 ),
               ],

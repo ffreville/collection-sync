@@ -7,7 +7,19 @@ import '../db/database.dart';
 import '../models/field_schema.dart';
 import '../sync/repositories.dart';
 import '../sync/sync_service.dart';
+import '../utils/format.dart';
 import 'item_edit_screen.dart';
+
+enum _SortMode { name, recent, valueDesc, quantityDesc }
+
+extension on _SortMode {
+  String get label => switch (this) {
+        _SortMode.name => 'Nom',
+        _SortMode.recent => 'Modifié récemment',
+        _SortMode.valueDesc => 'Valeur',
+        _SortMode.quantityDesc => 'Quantité',
+      };
+}
 
 class ItemsScreen extends StatefulWidget {
   final Collection collection;
@@ -25,6 +37,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
   String? _categoryFilter;
   String? _stateFilter;
   bool? _ownedFilter;
+  _SortMode _sort = _SortMode.name;
 
   @override
   Widget build(BuildContext context) {
@@ -37,6 +50,25 @@ class _ItemsScreenState extends State<ItemsScreen> {
       appBar: AppBar(
         title: Text(widget.collection.name),
         actions: [
+          PopupMenuButton<_SortMode>(
+            tooltip: 'Trier',
+            icon: const Icon(Icons.sort),
+            initialValue: _sort,
+            onSelected: (mode) => setState(() => _sort = mode),
+            itemBuilder: (context) => [
+              for (final mode in _SortMode.values)
+                PopupMenuItem(
+                  value: mode,
+                  child: Row(
+                    children: [
+                      if (mode == _sort) const Icon(Icons.check, size: 18) else const SizedBox(width: 18),
+                      const SizedBox(width: 8),
+                      Text(mode.label),
+                    ],
+                  ),
+                ),
+            ],
+          ),
           IconButton(
             icon: Icon(_grid ? Icons.view_list_outlined : Icons.grid_view_outlined),
             onPressed: () => setState(() => _grid = !_grid),
@@ -119,6 +151,16 @@ class _ItemsScreenState extends State<ItemsScreen> {
                   if (_ownedFilter != null && item.owned != _ownedFilter) return false;
                   return true;
                 }).toList();
+                switch (_sort) {
+                  case _SortMode.name:
+                    items.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+                  case _SortMode.recent:
+                    items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+                  case _SortMode.valueDesc:
+                    items.sort((a, b) => (b.estimatedValue ?? 0).compareTo(a.estimatedValue ?? 0));
+                  case _SortMode.quantityDesc:
+                    items.sort((a, b) => b.quantity.compareTo(a.quantity));
+                }
 
                 if (items.isEmpty) {
                   return Center(
@@ -163,6 +205,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
                             subtitle: Text([
                               if (item.category.isNotEmpty) item.category,
                               '×${item.quantity}',
+                              if (item.estimatedValue != null) formatCurrency(item.estimatedValue!),
                             ].join(' · ')),
                             trailing: item.owned
                                 ? null
@@ -236,8 +279,8 @@ class _ItemThumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (item.photoBase64 != null) {
-      return CircleAvatar(backgroundImage: MemoryImage(base64Decode(item.photoBase64!)));
+    if (item.photos.isNotEmpty) {
+      return CircleAvatar(backgroundImage: MemoryImage(base64Decode(item.photos.first)));
     }
     return const CircleAvatar(child: Icon(Icons.inventory_2_outlined));
   }
@@ -277,8 +320,8 @@ class _ItemGridCard extends StatelessWidget {
                     alignment: Alignment.center,
                     child: Opacity(
                       opacity: wanted ? 0.55 : 1,
-                      child: item.photoBase64 != null
-                          ? Image.memory(base64Decode(item.photoBase64!), fit: BoxFit.cover, width: double.infinity)
+                      child: item.photos.isNotEmpty
+                          ? Image.memory(base64Decode(item.photos.first), fit: BoxFit.cover, width: double.infinity)
                           : Icon(Icons.inventory_2_outlined, color: scheme.secondary, size: 28),
                     ),
                   ),
@@ -294,6 +337,21 @@ class _ItemGridCard extends StatelessWidget {
                         visualDensity: VisualDensity.compact,
                         padding: EdgeInsets.zero,
                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  if (item.photos.length > 1)
+                    Positioned(
+                      right: 8,
+                      bottom: 8,
+                      child: Chip(
+                        avatar: const Icon(Icons.photo_library_outlined, size: 14),
+                        label: Text('${item.photos.length}'),
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        backgroundColor: Colors.black54,
+                        labelStyle: const TextStyle(color: Colors.white),
+                        iconTheme: const IconThemeData(color: Colors.white),
                       ),
                     ),
                 ],

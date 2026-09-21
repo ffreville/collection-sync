@@ -1978,6 +1978,18 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     ),
     defaultValue: const Constant(true),
   );
+  static const VerificationMeta _photosJsonMeta = const VerificationMeta(
+    'photosJson',
+  );
+  @override
+  late final GeneratedColumn<String> photosJson = GeneratedColumn<String>(
+    'photos_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
   static const VerificationMeta _customValuesJsonMeta = const VerificationMeta(
     'customValuesJson',
   );
@@ -2009,6 +2021,7 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     state,
     notes,
     owned,
+    photosJson,
     customValuesJson,
   ];
   @override
@@ -2154,6 +2167,12 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
         owned.isAcceptableOrUnknown(data['owned']!, _ownedMeta),
       );
     }
+    if (data.containsKey('photos_json')) {
+      context.handle(
+        _photosJsonMeta,
+        photosJson.isAcceptableOrUnknown(data['photos_json']!, _photosJsonMeta),
+      );
+    }
     if (data.containsKey('custom_values_json')) {
       context.handle(
         _customValuesJsonMeta,
@@ -2240,6 +2259,10 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
         DriftSqlType.bool,
         data['${effectivePrefix}owned'],
       )!,
+      photosJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}photos_json'],
+      )!,
       customValuesJson: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}custom_values_json'],
@@ -2265,6 +2288,11 @@ class Item extends DataClass implements Insertable<Item> {
   final String ownerId;
   final String name;
   final String category;
+
+  /// Deprecated: the single-photo predecessor of [photosJson], kept only so
+  /// the schemaVersion-3 migration has somewhere to read the old value from.
+  /// Nothing writes to this column anymore — see [photosJson] and the
+  /// [ItemPhotos] extension below.
   final String? photoBase64;
   final int quantity;
   final double? estimatedValue;
@@ -2275,6 +2303,11 @@ class Item extends DataClass implements Insertable<Item> {
   /// entry rather than something you actually own. Kept as a real column
   /// (not a custom field) so every collection gets this distinction for free.
   final bool owned;
+
+  /// JSON array of base64-encoded photos — an item can carry a small gallery
+  /// rather than a single cover photo. The first entry is used as the cover
+  /// thumbnail wherever only one image fits (grid/list views).
+  final String photosJson;
   final String customValuesJson;
   const Item({
     required this.versionId,
@@ -2294,6 +2327,7 @@ class Item extends DataClass implements Insertable<Item> {
     required this.state,
     required this.notes,
     required this.owned,
+    required this.photosJson,
     required this.customValuesJson,
   });
   @override
@@ -2324,6 +2358,7 @@ class Item extends DataClass implements Insertable<Item> {
     map['state'] = Variable<String>(state);
     map['notes'] = Variable<String>(notes);
     map['owned'] = Variable<bool>(owned);
+    map['photos_json'] = Variable<String>(photosJson);
     map['custom_values_json'] = Variable<String>(customValuesJson);
     return map;
   }
@@ -2355,6 +2390,7 @@ class Item extends DataClass implements Insertable<Item> {
       state: Value(state),
       notes: Value(notes),
       owned: Value(owned),
+      photosJson: Value(photosJson),
       customValuesJson: Value(customValuesJson),
     );
   }
@@ -2382,6 +2418,7 @@ class Item extends DataClass implements Insertable<Item> {
       state: serializer.fromJson<String>(json['state']),
       notes: serializer.fromJson<String>(json['notes']),
       owned: serializer.fromJson<bool>(json['owned']),
+      photosJson: serializer.fromJson<String>(json['photosJson']),
       customValuesJson: serializer.fromJson<String>(json['customValuesJson']),
     );
   }
@@ -2406,6 +2443,7 @@ class Item extends DataClass implements Insertable<Item> {
       'state': serializer.toJson<String>(state),
       'notes': serializer.toJson<String>(notes),
       'owned': serializer.toJson<bool>(owned),
+      'photosJson': serializer.toJson<String>(photosJson),
       'customValuesJson': serializer.toJson<String>(customValuesJson),
     };
   }
@@ -2428,6 +2466,7 @@ class Item extends DataClass implements Insertable<Item> {
     String? state,
     String? notes,
     bool? owned,
+    String? photosJson,
     String? customValuesJson,
   }) => Item(
     versionId: versionId ?? this.versionId,
@@ -2453,6 +2492,7 @@ class Item extends DataClass implements Insertable<Item> {
     state: state ?? this.state,
     notes: notes ?? this.notes,
     owned: owned ?? this.owned,
+    photosJson: photosJson ?? this.photosJson,
     customValuesJson: customValuesJson ?? this.customValuesJson,
   );
   Item copyWithCompanion(ItemsCompanion data) {
@@ -2486,6 +2526,9 @@ class Item extends DataClass implements Insertable<Item> {
       state: data.state.present ? data.state.value : this.state,
       notes: data.notes.present ? data.notes.value : this.notes,
       owned: data.owned.present ? data.owned.value : this.owned,
+      photosJson: data.photosJson.present
+          ? data.photosJson.value
+          : this.photosJson,
       customValuesJson: data.customValuesJson.present
           ? data.customValuesJson.value
           : this.customValuesJson,
@@ -2512,6 +2555,7 @@ class Item extends DataClass implements Insertable<Item> {
           ..write('state: $state, ')
           ..write('notes: $notes, ')
           ..write('owned: $owned, ')
+          ..write('photosJson: $photosJson, ')
           ..write('customValuesJson: $customValuesJson')
           ..write(')'))
         .toString();
@@ -2536,6 +2580,7 @@ class Item extends DataClass implements Insertable<Item> {
     state,
     notes,
     owned,
+    photosJson,
     customValuesJson,
   );
   @override
@@ -2559,6 +2604,7 @@ class Item extends DataClass implements Insertable<Item> {
           other.state == this.state &&
           other.notes == this.notes &&
           other.owned == this.owned &&
+          other.photosJson == this.photosJson &&
           other.customValuesJson == this.customValuesJson);
 }
 
@@ -2580,6 +2626,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
   final Value<String> state;
   final Value<String> notes;
   final Value<bool> owned;
+  final Value<String> photosJson;
   final Value<String> customValuesJson;
   final Value<int> rowid;
   const ItemsCompanion({
@@ -2600,6 +2647,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.state = const Value.absent(),
     this.notes = const Value.absent(),
     this.owned = const Value.absent(),
+    this.photosJson = const Value.absent(),
     this.customValuesJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -2621,6 +2669,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.state = const Value.absent(),
     this.notes = const Value.absent(),
     this.owned = const Value.absent(),
+    this.photosJson = const Value.absent(),
     this.customValuesJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : versionId = Value(versionId),
@@ -2648,6 +2697,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Expression<String>? state,
     Expression<String>? notes,
     Expression<bool>? owned,
+    Expression<String>? photosJson,
     Expression<String>? customValuesJson,
     Expression<int>? rowid,
   }) {
@@ -2669,6 +2719,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       if (state != null) 'state': state,
       if (notes != null) 'notes': notes,
       if (owned != null) 'owned': owned,
+      if (photosJson != null) 'photos_json': photosJson,
       if (customValuesJson != null) 'custom_values_json': customValuesJson,
       if (rowid != null) 'rowid': rowid,
     });
@@ -2692,6 +2743,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Value<String>? state,
     Value<String>? notes,
     Value<bool>? owned,
+    Value<String>? photosJson,
     Value<String>? customValuesJson,
     Value<int>? rowid,
   }) {
@@ -2713,6 +2765,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       state: state ?? this.state,
       notes: notes ?? this.notes,
       owned: owned ?? this.owned,
+      photosJson: photosJson ?? this.photosJson,
       customValuesJson: customValuesJson ?? this.customValuesJson,
       rowid: rowid ?? this.rowid,
     );
@@ -2772,6 +2825,9 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     if (owned.present) {
       map['owned'] = Variable<bool>(owned.value);
     }
+    if (photosJson.present) {
+      map['photos_json'] = Variable<String>(photosJson.value);
+    }
     if (customValuesJson.present) {
       map['custom_values_json'] = Variable<String>(customValuesJson.value);
     }
@@ -2801,6 +2857,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
           ..write('state: $state, ')
           ..write('notes: $notes, ')
           ..write('owned: $owned, ')
+          ..write('photosJson: $photosJson, ')
           ..write('customValuesJson: $customValuesJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -3794,6 +3851,7 @@ typedef $$ItemsTableCreateCompanionBuilder = ItemsCompanion Function({
   Value<String> state,
   Value<String> notes,
   Value<bool> owned,
+  Value<String> photosJson,
   Value<String> customValuesJson,
   Value<int> rowid,
 });
@@ -3815,6 +3873,7 @@ typedef $$ItemsTableUpdateCompanionBuilder = ItemsCompanion Function({
   Value<String> state,
   Value<String> notes,
   Value<bool> owned,
+  Value<String> photosJson,
   Value<String> customValuesJson,
   Value<int> rowid,
 });
@@ -3909,6 +3968,11 @@ class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
 
   ColumnFilters<bool> get owned => $composableBuilder(
     column: $table.owned,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get photosJson => $composableBuilder(
+    column: $table.photosJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4012,6 +4076,11 @@ class $$ItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get photosJson => $composableBuilder(
+    column: $table.photosJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get customValuesJson => $composableBuilder(
     column: $table.customValuesJson,
     builder: (column) => ColumnOrderings(column),
@@ -4090,6 +4159,11 @@ class $$ItemsTableAnnotationComposer
   GeneratedColumn<bool> get owned =>
       $composableBuilder(column: $table.owned, builder: (column) => column);
 
+  GeneratedColumn<String> get photosJson => $composableBuilder(
+    column: $table.photosJson,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get customValuesJson => $composableBuilder(
     column: $table.customValuesJson,
     builder: (column) => column,
@@ -4141,6 +4215,7 @@ class $$ItemsTableTableManager
                 Value<String> state = const Value.absent(),
                 Value<String> notes = const Value.absent(),
                 Value<bool> owned = const Value.absent(),
+                Value<String> photosJson = const Value.absent(),
                 Value<String> customValuesJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ItemsCompanion(
@@ -4161,6 +4236,7 @@ class $$ItemsTableTableManager
                 state: state,
                 notes: notes,
                 owned: owned,
+                photosJson: photosJson,
                 customValuesJson: customValuesJson,
                 rowid: rowid,
               ),
@@ -4183,6 +4259,7 @@ class $$ItemsTableTableManager
                 Value<String> state = const Value.absent(),
                 Value<String> notes = const Value.absent(),
                 Value<bool> owned = const Value.absent(),
+                Value<String> photosJson = const Value.absent(),
                 Value<String> customValuesJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ItemsCompanion.insert(
@@ -4203,6 +4280,7 @@ class $$ItemsTableTableManager
                 state: state,
                 notes: notes,
                 owned: owned,
+                photosJson: photosJson,
                 customValuesJson: customValuesJson,
                 rowid: rowid,
               ),
