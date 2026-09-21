@@ -83,13 +83,6 @@ class Items extends Table with VersionedColumns {
 
   TextColumn get name => text()();
   TextColumn get category => text().withDefault(const Constant(''))();
-
-  /// Deprecated: the single-photo predecessor of [photosJson], kept only so
-  /// the schemaVersion-3 migration has somewhere to read the old value from.
-  /// Nothing writes to this column anymore — see [photosJson] and the
-  /// [ItemPhotos] extension below.
-  TextColumn get photoBase64 => text().nullable()();
-
   IntColumn get quantity => integer().withDefault(const Constant(1))();
   RealColumn get estimatedValue => real().nullable()();
   TextColumn get state => text().withDefault(const Constant(''))();
@@ -152,26 +145,6 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   int get schemaVersion => 3;
-
-  @override
-  MigrationStrategy get migration => MigrationStrategy(
-        onUpgrade: (m, from, to) async {
-          if (from < 2) {
-            await m.createTable(profiles);
-            await m.addColumn(items, items.owned);
-          }
-          if (from < 3) {
-            await m.addColumn(items, items.photosJson);
-            final withLegacyPhoto =
-                await (select(items)..where((t) => t.photoBase64.isNotNull())).get();
-            for (final row in withLegacyPhoto) {
-              await (update(items)..where((t) => t.id.equals(row.id))).write(
-                ItemsCompanion(photosJson: Value(jsonEncode([row.photoBase64]))),
-              );
-            }
-          }
-        },
-      );
 
   Stream<List<KnownUser>> watchKnownUsers() {
     return (select(knownUsers)
@@ -272,6 +245,30 @@ class AppDatabase extends _$AppDatabase {
       ..where(items.deleted.equals(false) &
           collections.deleted.equals(false) &
           universes.deleted.equals(false));
+    return query.watch().map((rows) => [
+          for (final row in rows)
+            ItemSearchResult(
+              item: row.readTable(items),
+              collection: row.readTable(collections),
+              universeName: row.readTable(universes).name,
+            ),
+        ]);
+  }
+
+  /// The wanted-but-not-owned items for one of your own profiles, across
+  /// every universe/collection — feeds the wishlist screen (share as text,
+  /// "je l'ai reçu" to flip an entry over to owned).
+  Stream<List<ItemSearchResult>> watchWishlistOf(String ownerId) {
+    final query = select(items).join([
+      innerJoin(collections, collections.id.equalsExp(items.collectionId)),
+      innerJoin(universes, universes.id.equalsExp(collections.universeId)),
+    ])
+      ..where(items.ownerId.equals(ownerId) &
+          items.owned.equals(false) &
+          items.deleted.equals(false) &
+          collections.deleted.equals(false) &
+          universes.deleted.equals(false))
+      ..orderBy([OrderingTerm(expression: items.name)]);
     return query.watch().map((rows) => [
           for (final row in rows)
             ItemSearchResult(

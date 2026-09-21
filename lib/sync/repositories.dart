@@ -222,6 +222,32 @@ class ItemRepository {
     await db.into(db.items).insertOnConflictUpdate(payload.toCompanion());
   }
 
+  /// "Je l'ai reçu" — flips a wanted item over to owned without touching
+  /// anything else about it.
+  Future<void> markOwned(Item existing) async {
+    _assertOwned(existing.ownerId, identity);
+    final payload = ItemPayload(
+      id: existing.id,
+      collectionId: existing.collectionId,
+      ownerId: existing.ownerId,
+      name: existing.name,
+      category: existing.category,
+      quantity: existing.quantity,
+      estimatedValue: existing.estimatedValue,
+      state: existing.state,
+      notes: existing.notes,
+      owned: true,
+      photosJson: existing.photosJson,
+      customValuesJson: existing.customValuesJson,
+      versionId: const Uuid().v4(),
+      parentVersionId: existing.versionId,
+      updatedByDevice: identity.id,
+      updatedAt: DateTime.now().toUtc(),
+      deleted: false,
+    );
+    await db.into(db.items).insertOnConflictUpdate(payload.toCompanion());
+  }
+
   Future<void> delete(Item existing) async {
     _assertOwned(existing.ownerId, identity);
     final payload = ItemPayload(

@@ -9,6 +9,7 @@ import 'global_search_screen.dart';
 import 'peers_screen.dart';
 import 'review_changes_screen.dart';
 import 'universes_screen.dart';
+import 'wishlist_screen.dart';
 
 class UsersScreen extends StatelessWidget {
   const UsersScreen({super.key});
@@ -22,6 +23,13 @@ class UsersScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Utilisateurs'),
         actions: [
+          IconButton(
+            tooltip: 'Liste de souhaits',
+            icon: const Icon(Icons.star_border),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const WishlistScreen()),
+            ),
+          ),
           IconButton(
             tooltip: 'Rechercher un objet',
             icon: const Icon(Icons.search),

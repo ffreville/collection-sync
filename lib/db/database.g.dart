@@ -1911,17 +1911,6 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
-  static const VerificationMeta _photoBase64Meta = const VerificationMeta(
-    'photoBase64',
-  );
-  @override
-  late final GeneratedColumn<String> photoBase64 = GeneratedColumn<String>(
-    'photo_base64',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
   static const VerificationMeta _quantityMeta = const VerificationMeta(
     'quantity',
   );
@@ -2015,7 +2004,6 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     ownerId,
     name,
     category,
-    photoBase64,
     quantity,
     estimatedValue,
     state,
@@ -2125,15 +2113,6 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
         category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
       );
     }
-    if (data.containsKey('photo_base64')) {
-      context.handle(
-        _photoBase64Meta,
-        photoBase64.isAcceptableOrUnknown(
-          data['photo_base64']!,
-          _photoBase64Meta,
-        ),
-      );
-    }
     if (data.containsKey('quantity')) {
       context.handle(
         _quantityMeta,
@@ -2235,10 +2214,6 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
         DriftSqlType.string,
         data['${effectivePrefix}category'],
       )!,
-      photoBase64: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}photo_base64'],
-      ),
       quantity: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}quantity'],
@@ -2288,12 +2263,6 @@ class Item extends DataClass implements Insertable<Item> {
   final String ownerId;
   final String name;
   final String category;
-
-  /// Deprecated: the single-photo predecessor of [photosJson], kept only so
-  /// the schemaVersion-3 migration has somewhere to read the old value from.
-  /// Nothing writes to this column anymore — see [photosJson] and the
-  /// [ItemPhotos] extension below.
-  final String? photoBase64;
   final int quantity;
   final double? estimatedValue;
   final String state;
@@ -2321,7 +2290,6 @@ class Item extends DataClass implements Insertable<Item> {
     required this.ownerId,
     required this.name,
     required this.category,
-    this.photoBase64,
     required this.quantity,
     this.estimatedValue,
     required this.state,
@@ -2348,9 +2316,6 @@ class Item extends DataClass implements Insertable<Item> {
     map['owner_id'] = Variable<String>(ownerId);
     map['name'] = Variable<String>(name);
     map['category'] = Variable<String>(category);
-    if (!nullToAbsent || photoBase64 != null) {
-      map['photo_base64'] = Variable<String>(photoBase64);
-    }
     map['quantity'] = Variable<int>(quantity);
     if (!nullToAbsent || estimatedValue != null) {
       map['estimated_value'] = Variable<double>(estimatedValue);
@@ -2380,9 +2345,6 @@ class Item extends DataClass implements Insertable<Item> {
       ownerId: Value(ownerId),
       name: Value(name),
       category: Value(category),
-      photoBase64: photoBase64 == null && nullToAbsent
-          ? const Value.absent()
-          : Value(photoBase64),
       quantity: Value(quantity),
       estimatedValue: estimatedValue == null && nullToAbsent
           ? const Value.absent()
@@ -2412,7 +2374,6 @@ class Item extends DataClass implements Insertable<Item> {
       ownerId: serializer.fromJson<String>(json['ownerId']),
       name: serializer.fromJson<String>(json['name']),
       category: serializer.fromJson<String>(json['category']),
-      photoBase64: serializer.fromJson<String?>(json['photoBase64']),
       quantity: serializer.fromJson<int>(json['quantity']),
       estimatedValue: serializer.fromJson<double?>(json['estimatedValue']),
       state: serializer.fromJson<String>(json['state']),
@@ -2437,7 +2398,6 @@ class Item extends DataClass implements Insertable<Item> {
       'ownerId': serializer.toJson<String>(ownerId),
       'name': serializer.toJson<String>(name),
       'category': serializer.toJson<String>(category),
-      'photoBase64': serializer.toJson<String?>(photoBase64),
       'quantity': serializer.toJson<int>(quantity),
       'estimatedValue': serializer.toJson<double?>(estimatedValue),
       'state': serializer.toJson<String>(state),
@@ -2460,7 +2420,6 @@ class Item extends DataClass implements Insertable<Item> {
     String? ownerId,
     String? name,
     String? category,
-    Value<String?> photoBase64 = const Value.absent(),
     int? quantity,
     Value<double?> estimatedValue = const Value.absent(),
     String? state,
@@ -2484,7 +2443,6 @@ class Item extends DataClass implements Insertable<Item> {
     ownerId: ownerId ?? this.ownerId,
     name: name ?? this.name,
     category: category ?? this.category,
-    photoBase64: photoBase64.present ? photoBase64.value : this.photoBase64,
     quantity: quantity ?? this.quantity,
     estimatedValue: estimatedValue.present
         ? estimatedValue.value
@@ -2516,9 +2474,6 @@ class Item extends DataClass implements Insertable<Item> {
       ownerId: data.ownerId.present ? data.ownerId.value : this.ownerId,
       name: data.name.present ? data.name.value : this.name,
       category: data.category.present ? data.category.value : this.category,
-      photoBase64: data.photoBase64.present
-          ? data.photoBase64.value
-          : this.photoBase64,
       quantity: data.quantity.present ? data.quantity.value : this.quantity,
       estimatedValue: data.estimatedValue.present
           ? data.estimatedValue.value
@@ -2549,7 +2504,6 @@ class Item extends DataClass implements Insertable<Item> {
           ..write('ownerId: $ownerId, ')
           ..write('name: $name, ')
           ..write('category: $category, ')
-          ..write('photoBase64: $photoBase64, ')
           ..write('quantity: $quantity, ')
           ..write('estimatedValue: $estimatedValue, ')
           ..write('state: $state, ')
@@ -2574,7 +2528,6 @@ class Item extends DataClass implements Insertable<Item> {
     ownerId,
     name,
     category,
-    photoBase64,
     quantity,
     estimatedValue,
     state,
@@ -2598,7 +2551,6 @@ class Item extends DataClass implements Insertable<Item> {
           other.ownerId == this.ownerId &&
           other.name == this.name &&
           other.category == this.category &&
-          other.photoBase64 == this.photoBase64 &&
           other.quantity == this.quantity &&
           other.estimatedValue == this.estimatedValue &&
           other.state == this.state &&
@@ -2620,7 +2572,6 @@ class ItemsCompanion extends UpdateCompanion<Item> {
   final Value<String> ownerId;
   final Value<String> name;
   final Value<String> category;
-  final Value<String?> photoBase64;
   final Value<int> quantity;
   final Value<double?> estimatedValue;
   final Value<String> state;
@@ -2641,7 +2592,6 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.ownerId = const Value.absent(),
     this.name = const Value.absent(),
     this.category = const Value.absent(),
-    this.photoBase64 = const Value.absent(),
     this.quantity = const Value.absent(),
     this.estimatedValue = const Value.absent(),
     this.state = const Value.absent(),
@@ -2663,7 +2613,6 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     required String ownerId,
     required String name,
     this.category = const Value.absent(),
-    this.photoBase64 = const Value.absent(),
     this.quantity = const Value.absent(),
     this.estimatedValue = const Value.absent(),
     this.state = const Value.absent(),
@@ -2691,7 +2640,6 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Expression<String>? ownerId,
     Expression<String>? name,
     Expression<String>? category,
-    Expression<String>? photoBase64,
     Expression<int>? quantity,
     Expression<double>? estimatedValue,
     Expression<String>? state,
@@ -2713,7 +2661,6 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       if (ownerId != null) 'owner_id': ownerId,
       if (name != null) 'name': name,
       if (category != null) 'category': category,
-      if (photoBase64 != null) 'photo_base64': photoBase64,
       if (quantity != null) 'quantity': quantity,
       if (estimatedValue != null) 'estimated_value': estimatedValue,
       if (state != null) 'state': state,
@@ -2737,7 +2684,6 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Value<String>? ownerId,
     Value<String>? name,
     Value<String>? category,
-    Value<String?>? photoBase64,
     Value<int>? quantity,
     Value<double?>? estimatedValue,
     Value<String>? state,
@@ -2759,7 +2705,6 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       ownerId: ownerId ?? this.ownerId,
       name: name ?? this.name,
       category: category ?? this.category,
-      photoBase64: photoBase64 ?? this.photoBase64,
       quantity: quantity ?? this.quantity,
       estimatedValue: estimatedValue ?? this.estimatedValue,
       state: state ?? this.state,
@@ -2807,9 +2752,6 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     if (category.present) {
       map['category'] = Variable<String>(category.value);
     }
-    if (photoBase64.present) {
-      map['photo_base64'] = Variable<String>(photoBase64.value);
-    }
     if (quantity.present) {
       map['quantity'] = Variable<int>(quantity.value);
     }
@@ -2851,7 +2793,6 @@ class ItemsCompanion extends UpdateCompanion<Item> {
           ..write('ownerId: $ownerId, ')
           ..write('name: $name, ')
           ..write('category: $category, ')
-          ..write('photoBase64: $photoBase64, ')
           ..write('quantity: $quantity, ')
           ..write('estimatedValue: $estimatedValue, ')
           ..write('state: $state, ')
@@ -3845,7 +3786,6 @@ typedef $$ItemsTableCreateCompanionBuilder = ItemsCompanion Function({
   required String ownerId,
   required String name,
   Value<String> category,
-  Value<String?> photoBase64,
   Value<int> quantity,
   Value<double?> estimatedValue,
   Value<String> state,
@@ -3867,7 +3807,6 @@ typedef $$ItemsTableUpdateCompanionBuilder = ItemsCompanion Function({
   Value<String> ownerId,
   Value<String> name,
   Value<String> category,
-  Value<String?> photoBase64,
   Value<int> quantity,
   Value<double?> estimatedValue,
   Value<String> state,
@@ -3938,11 +3877,6 @@ class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
 
   ColumnFilters<String> get category => $composableBuilder(
     column: $table.category,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get photoBase64 => $composableBuilder(
-    column: $table.photoBase64,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4046,11 +3980,6 @@ class $$ItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get photoBase64 => $composableBuilder(
-    column: $table.photoBase64,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<int> get quantity => $composableBuilder(
     column: $table.quantity,
     builder: (column) => ColumnOrderings(column),
@@ -4137,11 +4066,6 @@ class $$ItemsTableAnnotationComposer
   GeneratedColumn<String> get category =>
       $composableBuilder(column: $table.category, builder: (column) => column);
 
-  GeneratedColumn<String> get photoBase64 => $composableBuilder(
-    column: $table.photoBase64,
-    builder: (column) => column,
-  );
-
   GeneratedColumn<int> get quantity =>
       $composableBuilder(column: $table.quantity, builder: (column) => column);
 
@@ -4209,7 +4133,6 @@ class $$ItemsTableTableManager
                 Value<String> ownerId = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String> category = const Value.absent(),
-                Value<String?> photoBase64 = const Value.absent(),
                 Value<int> quantity = const Value.absent(),
                 Value<double?> estimatedValue = const Value.absent(),
                 Value<String> state = const Value.absent(),
@@ -4230,7 +4153,6 @@ class $$ItemsTableTableManager
                 ownerId: ownerId,
                 name: name,
                 category: category,
-                photoBase64: photoBase64,
                 quantity: quantity,
                 estimatedValue: estimatedValue,
                 state: state,
@@ -4253,7 +4175,6 @@ class $$ItemsTableTableManager
                 required String ownerId,
                 required String name,
                 Value<String> category = const Value.absent(),
-                Value<String?> photoBase64 = const Value.absent(),
                 Value<int> quantity = const Value.absent(),
                 Value<double?> estimatedValue = const Value.absent(),
                 Value<String> state = const Value.absent(),
@@ -4274,7 +4195,6 @@ class $$ItemsTableTableManager
                 ownerId: ownerId,
                 name: name,
                 category: category,
-                photoBase64: photoBase64,
                 quantity: quantity,
                 estimatedValue: estimatedValue,
                 state: state,
