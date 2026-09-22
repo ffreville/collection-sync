@@ -35,6 +35,8 @@
 	<string>CollectionSync utilise le réseau local pour synchroniser votre collection directement avec vos autres appareils, sans passer par un serveur.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>CollectionSync a besoin d'accéder à vos photos pour illustrer les objets de vos collections.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>CollectionSync utilise l'appareil photo pour scanner le code-barres d'un objet et préremplir sa fiche.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

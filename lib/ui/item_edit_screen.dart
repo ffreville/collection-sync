@@ -2,13 +2,16 @@ import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../db/database.dart';
 import '../models/field_schema.dart';
+import '../services/barcode_lookup.dart';
 import '../sync/repositories.dart';
 import '../sync/sync_service.dart';
+import 'barcode_scanner_screen.dart';
 
 class ItemEditScreen extends StatefulWidget {
   final Collection collection;
@@ -84,6 +87,12 @@ class _ItemEditScreenState extends State<ItemEditScreen> {
       appBar: AppBar(
         title: Text(widget.readOnly ? widget.existing!.name : (isEditing ? "Modifier l'objet" : 'Nouvel objet')),
         actions: [
+          if (!widget.readOnly)
+            IconButton(
+              icon: const Icon(Icons.qr_code_scanner),
+              tooltip: 'Scanner un code-barres',
+              onPressed: _scanBarcode,
+            ),
           if (!widget.readOnly && isEditing)
             IconButton(
               icon: const Icon(Icons.delete_outline),
@@ -355,6 +364,43 @@ class _ItemEditScreenState extends State<ItemEditScreen> {
   Future<void> _addPhoto() async {
     final b64 = await _pickImageBase64();
     if (b64 != null) setState(() => _photos.add(b64));
+  }
+
+  /// Scans a barcode, looks it up against public product databases, and
+  /// prefills the name/photo when something matches — coverage is patchy
+  /// for niche collectibles, so a miss just leaves the form as it was.
+  Future<void> _scanBarcode() async {
+    final code = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
+    );
+    if (code == null || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(const SnackBar(content: Text('Recherche du produit…')));
+
+    final result = await lookupBarcode(code);
+    if (!mounted) return;
+    messenger.hideCurrentSnackBar();
+
+    if (result == null || result.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Aucune information trouvée pour ce code-barres.')),
+      );
+      return;
+    }
+
+    if (result.name != null) _nameController.text = result.name!;
+
+    if (result.imageUrl != null) {
+      try {
+        final response = await http.get(Uri.parse(result.imageUrl!));
+        if (response.statusCode == 200 && mounted) {
+          setState(() => _photos.add(base64Encode(response.bodyBytes)));
+        }
+      } catch (_) {
+        // No photo, no big deal — the name prefill above is the main win.
+      }
+    }
   }
 
   String _formatDate(DateTime date) =>
