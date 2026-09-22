@@ -5,8 +5,16 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:uuid/uuid.dart';
 
 part 'database.g.dart';
+
+/// The single sqlite file backing [AppDatabase] — shared with the backup/
+/// restore screen so it copies the exact same path the live connection uses.
+Future<File> resolveDatabaseFile() async {
+  final dbFolder = await getApplicationDocumentsDirectory();
+  return File(p.join(dbFolder.path, 'collection_sync.sqlite'));
+}
 
 /// Other people's profiles this device has synced with at least once — one
 /// row per remote *profile* (not per device: a device can host several, see
@@ -31,6 +39,27 @@ class Profiles extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
   DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// One completed sync session's summary — who with, when, and what happened.
+/// Not itself synced between devices: purely local bookkeeping, same spirit
+/// as [KnownUsers].
+class SyncLogs extends Table {
+  TextColumn get id => text()();
+  TextColumn get peerName => text()();
+  DateTimeColumn get startedAt => dateTime()();
+
+  /// 'incoming' (a peer connected to you — everything it sent was applied
+  /// automatically) or 'outgoing' (you initiated — some changes may only
+  /// have been proposed, see [pendingCount]).
+  TextColumn get direction => text()();
+
+  IntColumn get appliedCount => integer().withDefault(const Constant(0))();
+  IntColumn get pendingCount => integer().withDefault(const Constant(0))();
+  IntColumn get conflictCount => integer().withDefault(const Constant(0))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -138,13 +167,13 @@ class ItemSearchResult {
   });
 }
 
-@DriftDatabase(tables: [KnownUsers, Profiles, Universes, Collections, Items])
+@DriftDatabase(tables: [KnownUsers, Profiles, Universes, Collections, Items, SyncLogs])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   Stream<List<KnownUser>> watchKnownUsers() {
     return (select(knownUsers)
@@ -279,6 +308,31 @@ class AppDatabase extends _$AppDatabase {
         ]);
   }
 
+  Future<void> logSyncSession({
+    required String peerName,
+    required String direction,
+    required int appliedCount,
+    required int pendingCount,
+    required int conflictCount,
+  }) {
+    return into(syncLogs).insert(SyncLogsCompanion.insert(
+      id: const Uuid().v4(),
+      peerName: peerName,
+      startedAt: DateTime.now().toUtc(),
+      direction: direction,
+      appliedCount: Value(appliedCount),
+      pendingCount: Value(pendingCount),
+      conflictCount: Value(conflictCount),
+    ));
+  }
+
+  Stream<List<SyncLog>> watchSyncLogs() {
+    return (select(syncLogs)
+          ..orderBy([(t) => OrderingTerm.desc(t.startedAt)])
+          ..limit(100))
+        .watch();
+  }
+
   /// Forgets a remote profile you've synced with: drops the [KnownUsers]
   /// bookkeeping row and every local copy of content it owns. This is a hard
   /// local purge, not a synced deletion — you don't own that content, so
@@ -295,8 +349,7 @@ class AppDatabase extends _$AppDatabase {
 
   static QueryExecutor _openConnection() {
     return LazyDatabase(() async {
-      final dbFolder = await getApplicationDocumentsDirectory();
-      final file = File(p.join(dbFolder.path, 'collection_sync.sqlite'));
+      final file = await resolveDatabaseFile();
       return NativeDatabase.createInBackground(file);
     });
   }

@@ -2806,6 +2806,482 @@ class ItemsCompanion extends UpdateCompanion<Item> {
   }
 }
 
+class $SyncLogsTable extends SyncLogs with TableInfo<$SyncLogsTable, SyncLog> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SyncLogsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _peerNameMeta = const VerificationMeta(
+    'peerName',
+  );
+  @override
+  late final GeneratedColumn<String> peerName = GeneratedColumn<String>(
+    'peer_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _startedAtMeta = const VerificationMeta(
+    'startedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> startedAt = GeneratedColumn<DateTime>(
+    'started_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _directionMeta = const VerificationMeta(
+    'direction',
+  );
+  @override
+  late final GeneratedColumn<String> direction = GeneratedColumn<String>(
+    'direction',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _appliedCountMeta = const VerificationMeta(
+    'appliedCount',
+  );
+  @override
+  late final GeneratedColumn<int> appliedCount = GeneratedColumn<int>(
+    'applied_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _pendingCountMeta = const VerificationMeta(
+    'pendingCount',
+  );
+  @override
+  late final GeneratedColumn<int> pendingCount = GeneratedColumn<int>(
+    'pending_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _conflictCountMeta = const VerificationMeta(
+    'conflictCount',
+  );
+  @override
+  late final GeneratedColumn<int> conflictCount = GeneratedColumn<int>(
+    'conflict_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    peerName,
+    startedAt,
+    direction,
+    appliedCount,
+    pendingCount,
+    conflictCount,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'sync_logs';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SyncLog> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('peer_name')) {
+      context.handle(
+        _peerNameMeta,
+        peerName.isAcceptableOrUnknown(data['peer_name']!, _peerNameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_peerNameMeta);
+    }
+    if (data.containsKey('started_at')) {
+      context.handle(
+        _startedAtMeta,
+        startedAt.isAcceptableOrUnknown(data['started_at']!, _startedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_startedAtMeta);
+    }
+    if (data.containsKey('direction')) {
+      context.handle(
+        _directionMeta,
+        direction.isAcceptableOrUnknown(data['direction']!, _directionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_directionMeta);
+    }
+    if (data.containsKey('applied_count')) {
+      context.handle(
+        _appliedCountMeta,
+        appliedCount.isAcceptableOrUnknown(
+          data['applied_count']!,
+          _appliedCountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pending_count')) {
+      context.handle(
+        _pendingCountMeta,
+        pendingCount.isAcceptableOrUnknown(
+          data['pending_count']!,
+          _pendingCountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('conflict_count')) {
+      context.handle(
+        _conflictCountMeta,
+        conflictCount.isAcceptableOrUnknown(
+          data['conflict_count']!,
+          _conflictCountMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  SyncLog map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SyncLog(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      peerName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}peer_name'],
+      )!,
+      startedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}started_at'],
+      )!,
+      direction: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}direction'],
+      )!,
+      appliedCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}applied_count'],
+      )!,
+      pendingCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}pending_count'],
+      )!,
+      conflictCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}conflict_count'],
+      )!,
+    );
+  }
+
+  @override
+  $SyncLogsTable createAlias(String alias) {
+    return $SyncLogsTable(attachedDatabase, alias);
+  }
+}
+
+class SyncLog extends DataClass implements Insertable<SyncLog> {
+  final String id;
+  final String peerName;
+  final DateTime startedAt;
+
+  /// 'incoming' (a peer connected to you — everything it sent was applied
+  /// automatically) or 'outgoing' (you initiated — some changes may only
+  /// have been proposed, see [pendingCount]).
+  final String direction;
+  final int appliedCount;
+  final int pendingCount;
+  final int conflictCount;
+  const SyncLog({
+    required this.id,
+    required this.peerName,
+    required this.startedAt,
+    required this.direction,
+    required this.appliedCount,
+    required this.pendingCount,
+    required this.conflictCount,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['peer_name'] = Variable<String>(peerName);
+    map['started_at'] = Variable<DateTime>(startedAt);
+    map['direction'] = Variable<String>(direction);
+    map['applied_count'] = Variable<int>(appliedCount);
+    map['pending_count'] = Variable<int>(pendingCount);
+    map['conflict_count'] = Variable<int>(conflictCount);
+    return map;
+  }
+
+  SyncLogsCompanion toCompanion(bool nullToAbsent) {
+    return SyncLogsCompanion(
+      id: Value(id),
+      peerName: Value(peerName),
+      startedAt: Value(startedAt),
+      direction: Value(direction),
+      appliedCount: Value(appliedCount),
+      pendingCount: Value(pendingCount),
+      conflictCount: Value(conflictCount),
+    );
+  }
+
+  factory SyncLog.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SyncLog(
+      id: serializer.fromJson<String>(json['id']),
+      peerName: serializer.fromJson<String>(json['peerName']),
+      startedAt: serializer.fromJson<DateTime>(json['startedAt']),
+      direction: serializer.fromJson<String>(json['direction']),
+      appliedCount: serializer.fromJson<int>(json['appliedCount']),
+      pendingCount: serializer.fromJson<int>(json['pendingCount']),
+      conflictCount: serializer.fromJson<int>(json['conflictCount']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'peerName': serializer.toJson<String>(peerName),
+      'startedAt': serializer.toJson<DateTime>(startedAt),
+      'direction': serializer.toJson<String>(direction),
+      'appliedCount': serializer.toJson<int>(appliedCount),
+      'pendingCount': serializer.toJson<int>(pendingCount),
+      'conflictCount': serializer.toJson<int>(conflictCount),
+    };
+  }
+
+  SyncLog copyWith({
+    String? id,
+    String? peerName,
+    DateTime? startedAt,
+    String? direction,
+    int? appliedCount,
+    int? pendingCount,
+    int? conflictCount,
+  }) => SyncLog(
+    id: id ?? this.id,
+    peerName: peerName ?? this.peerName,
+    startedAt: startedAt ?? this.startedAt,
+    direction: direction ?? this.direction,
+    appliedCount: appliedCount ?? this.appliedCount,
+    pendingCount: pendingCount ?? this.pendingCount,
+    conflictCount: conflictCount ?? this.conflictCount,
+  );
+  SyncLog copyWithCompanion(SyncLogsCompanion data) {
+    return SyncLog(
+      id: data.id.present ? data.id.value : this.id,
+      peerName: data.peerName.present ? data.peerName.value : this.peerName,
+      startedAt: data.startedAt.present ? data.startedAt.value : this.startedAt,
+      direction: data.direction.present ? data.direction.value : this.direction,
+      appliedCount: data.appliedCount.present
+          ? data.appliedCount.value
+          : this.appliedCount,
+      pendingCount: data.pendingCount.present
+          ? data.pendingCount.value
+          : this.pendingCount,
+      conflictCount: data.conflictCount.present
+          ? data.conflictCount.value
+          : this.conflictCount,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncLog(')
+          ..write('id: $id, ')
+          ..write('peerName: $peerName, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('direction: $direction, ')
+          ..write('appliedCount: $appliedCount, ')
+          ..write('pendingCount: $pendingCount, ')
+          ..write('conflictCount: $conflictCount')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    peerName,
+    startedAt,
+    direction,
+    appliedCount,
+    pendingCount,
+    conflictCount,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SyncLog &&
+          other.id == this.id &&
+          other.peerName == this.peerName &&
+          other.startedAt == this.startedAt &&
+          other.direction == this.direction &&
+          other.appliedCount == this.appliedCount &&
+          other.pendingCount == this.pendingCount &&
+          other.conflictCount == this.conflictCount);
+}
+
+class SyncLogsCompanion extends UpdateCompanion<SyncLog> {
+  final Value<String> id;
+  final Value<String> peerName;
+  final Value<DateTime> startedAt;
+  final Value<String> direction;
+  final Value<int> appliedCount;
+  final Value<int> pendingCount;
+  final Value<int> conflictCount;
+  final Value<int> rowid;
+  const SyncLogsCompanion({
+    this.id = const Value.absent(),
+    this.peerName = const Value.absent(),
+    this.startedAt = const Value.absent(),
+    this.direction = const Value.absent(),
+    this.appliedCount = const Value.absent(),
+    this.pendingCount = const Value.absent(),
+    this.conflictCount = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SyncLogsCompanion.insert({
+    required String id,
+    required String peerName,
+    required DateTime startedAt,
+    required String direction,
+    this.appliedCount = const Value.absent(),
+    this.pendingCount = const Value.absent(),
+    this.conflictCount = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       peerName = Value(peerName),
+       startedAt = Value(startedAt),
+       direction = Value(direction);
+  static Insertable<SyncLog> custom({
+    Expression<String>? id,
+    Expression<String>? peerName,
+    Expression<DateTime>? startedAt,
+    Expression<String>? direction,
+    Expression<int>? appliedCount,
+    Expression<int>? pendingCount,
+    Expression<int>? conflictCount,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (peerName != null) 'peer_name': peerName,
+      if (startedAt != null) 'started_at': startedAt,
+      if (direction != null) 'direction': direction,
+      if (appliedCount != null) 'applied_count': appliedCount,
+      if (pendingCount != null) 'pending_count': pendingCount,
+      if (conflictCount != null) 'conflict_count': conflictCount,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SyncLogsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? peerName,
+    Value<DateTime>? startedAt,
+    Value<String>? direction,
+    Value<int>? appliedCount,
+    Value<int>? pendingCount,
+    Value<int>? conflictCount,
+    Value<int>? rowid,
+  }) {
+    return SyncLogsCompanion(
+      id: id ?? this.id,
+      peerName: peerName ?? this.peerName,
+      startedAt: startedAt ?? this.startedAt,
+      direction: direction ?? this.direction,
+      appliedCount: appliedCount ?? this.appliedCount,
+      pendingCount: pendingCount ?? this.pendingCount,
+      conflictCount: conflictCount ?? this.conflictCount,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (peerName.present) {
+      map['peer_name'] = Variable<String>(peerName.value);
+    }
+    if (startedAt.present) {
+      map['started_at'] = Variable<DateTime>(startedAt.value);
+    }
+    if (direction.present) {
+      map['direction'] = Variable<String>(direction.value);
+    }
+    if (appliedCount.present) {
+      map['applied_count'] = Variable<int>(appliedCount.value);
+    }
+    if (pendingCount.present) {
+      map['pending_count'] = Variable<int>(pendingCount.value);
+    }
+    if (conflictCount.present) {
+      map['conflict_count'] = Variable<int>(conflictCount.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncLogsCompanion(')
+          ..write('id: $id, ')
+          ..write('peerName: $peerName, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('direction: $direction, ')
+          ..write('appliedCount: $appliedCount, ')
+          ..write('pendingCount: $pendingCount, ')
+          ..write('conflictCount: $conflictCount, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -2814,6 +3290,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $UniversesTable universes = $UniversesTable(this);
   late final $CollectionsTable collections = $CollectionsTable(this);
   late final $ItemsTable items = $ItemsTable(this);
+  late final $SyncLogsTable syncLogs = $SyncLogsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2824,6 +3301,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     universes,
     collections,
     items,
+    syncLogs,
   ];
 }
 
@@ -4235,6 +4713,251 @@ typedef $$ItemsTableProcessedTableManager =
       Item,
       PrefetchHooks Function()
     >;
+typedef $$SyncLogsTableCreateCompanionBuilder = SyncLogsCompanion Function({
+  required String id,
+  required String peerName,
+  required DateTime startedAt,
+  required String direction,
+  Value<int> appliedCount,
+  Value<int> pendingCount,
+  Value<int> conflictCount,
+  Value<int> rowid,
+});
+typedef $$SyncLogsTableUpdateCompanionBuilder = SyncLogsCompanion Function({
+  Value<String> id,
+  Value<String> peerName,
+  Value<DateTime> startedAt,
+  Value<String> direction,
+  Value<int> appliedCount,
+  Value<int> pendingCount,
+  Value<int> conflictCount,
+  Value<int> rowid,
+});
+
+class $$SyncLogsTableFilterComposer
+    extends Composer<_$AppDatabase, $SyncLogsTable> {
+  $$SyncLogsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get peerName => $composableBuilder(
+    column: $table.peerName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get startedAt => $composableBuilder(
+    column: $table.startedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get direction => $composableBuilder(
+    column: $table.direction,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get appliedCount => $composableBuilder(
+    column: $table.appliedCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get pendingCount => $composableBuilder(
+    column: $table.pendingCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get conflictCount => $composableBuilder(
+    column: $table.conflictCount,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SyncLogsTableOrderingComposer
+    extends Composer<_$AppDatabase, $SyncLogsTable> {
+  $$SyncLogsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get peerName => $composableBuilder(
+    column: $table.peerName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get startedAt => $composableBuilder(
+    column: $table.startedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get direction => $composableBuilder(
+    column: $table.direction,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get appliedCount => $composableBuilder(
+    column: $table.appliedCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get pendingCount => $composableBuilder(
+    column: $table.pendingCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get conflictCount => $composableBuilder(
+    column: $table.conflictCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SyncLogsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SyncLogsTable> {
+  $$SyncLogsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get peerName =>
+      $composableBuilder(column: $table.peerName, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get startedAt =>
+      $composableBuilder(column: $table.startedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get direction =>
+      $composableBuilder(column: $table.direction, builder: (column) => column);
+
+  GeneratedColumn<int> get appliedCount => $composableBuilder(
+    column: $table.appliedCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get pendingCount => $composableBuilder(
+    column: $table.pendingCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get conflictCount => $composableBuilder(
+    column: $table.conflictCount,
+    builder: (column) => column,
+  );
+}
+
+class $$SyncLogsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SyncLogsTable,
+          SyncLog,
+          $$SyncLogsTableFilterComposer,
+          $$SyncLogsTableOrderingComposer,
+          $$SyncLogsTableAnnotationComposer,
+          $$SyncLogsTableCreateCompanionBuilder,
+          $$SyncLogsTableUpdateCompanionBuilder,
+          (SyncLog, BaseReferences<_$AppDatabase, $SyncLogsTable, SyncLog>),
+          SyncLog,
+          PrefetchHooks Function()
+        > {
+  $$SyncLogsTableTableManager(_$AppDatabase db, $SyncLogsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SyncLogsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SyncLogsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SyncLogsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> peerName = const Value.absent(),
+                Value<DateTime> startedAt = const Value.absent(),
+                Value<String> direction = const Value.absent(),
+                Value<int> appliedCount = const Value.absent(),
+                Value<int> pendingCount = const Value.absent(),
+                Value<int> conflictCount = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SyncLogsCompanion(
+                id: id,
+                peerName: peerName,
+                startedAt: startedAt,
+                direction: direction,
+                appliedCount: appliedCount,
+                pendingCount: pendingCount,
+                conflictCount: conflictCount,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String peerName,
+                required DateTime startedAt,
+                required String direction,
+                Value<int> appliedCount = const Value.absent(),
+                Value<int> pendingCount = const Value.absent(),
+                Value<int> conflictCount = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SyncLogsCompanion.insert(
+                id: id,
+                peerName: peerName,
+                startedAt: startedAt,
+                direction: direction,
+                appliedCount: appliedCount,
+                pendingCount: pendingCount,
+                conflictCount: conflictCount,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$SyncLogsTable, SyncLog>(table),
+                  BaseReferences<_$AppDatabase, $SyncLogsTable, SyncLog>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SyncLogsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SyncLogsTable,
+      SyncLog,
+      $$SyncLogsTableFilterComposer,
+      $$SyncLogsTableOrderingComposer,
+      $$SyncLogsTableAnnotationComposer,
+      $$SyncLogsTableCreateCompanionBuilder,
+      $$SyncLogsTableUpdateCompanionBuilder,
+      (SyncLog, BaseReferences<_$AppDatabase, $SyncLogsTable, SyncLog>),
+      SyncLog,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -4249,4 +4972,6 @@ class $AppDatabaseManager {
       $$CollectionsTableTableManager(_db, _db.collections);
   $$ItemsTableTableManager get items =>
       $$ItemsTableTableManager(_db, _db.items);
+  $$SyncLogsTableTableManager get syncLogs =>
+      $$SyncLogsTableTableManager(_db, _db.syncLogs);
 }

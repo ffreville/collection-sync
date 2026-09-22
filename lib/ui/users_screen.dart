@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../db/database.dart';
 import '../sync/repositories.dart';
 import '../sync/sync_service.dart';
+import 'backup_screen.dart';
 import 'conflict_resolution_screen.dart';
 import 'global_search_screen.dart';
 import 'peers_screen.dart';
@@ -65,6 +66,21 @@ class UsersScreen extends StatelessWidget {
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const PeersScreen()),
             ),
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Plus',
+            onSelected: (_) => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const BackupScreen()),
+            ),
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: 'backup',
+                child: ListTile(
+                  leading: Icon(Icons.save_outlined),
+                  title: Text('Sauvegarde'),
+                ),
+              ),
+            ],
           ),
         ],
       ),

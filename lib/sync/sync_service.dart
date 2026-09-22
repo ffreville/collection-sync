@@ -320,6 +320,7 @@ class SyncService extends ChangeNotifier {
 
     var newConflicts = 0;
     var newPendingChanges = 0;
+    var appliedCount = 0;
 
     final universeResult = await _syncKind<UniversePayload>(
       channel: channel,
@@ -350,6 +351,7 @@ class SyncService extends ChangeNotifier {
             newPendingChanges++;
           } else {
             await apply();
+            appliedCount++;
           }
         case MergeAction.conflict:
           universeConflicts.add(UniverseConflict(local: local!, remote: remote));
@@ -393,6 +395,7 @@ class SyncService extends ChangeNotifier {
             newPendingChanges++;
           } else {
             await apply();
+            appliedCount++;
           }
         case MergeAction.conflict:
           collectionConflicts.add(CollectionConflict(local: local!, remote: remote));
@@ -429,6 +432,7 @@ class SyncService extends ChangeNotifier {
             newPendingChanges++;
           } else {
             await apply();
+            appliedCount++;
           }
         case MergeAction.conflict:
           itemConflicts.add(ItemConflict(local: local!, remote: remote));
@@ -441,6 +445,17 @@ class SyncService extends ChangeNotifier {
     channel.send(SyncMessage('done', {}));
     await queue.next;
     await queue.cancel(immediate: true);
+
+    final peerName = remoteProfiles.isNotEmpty
+        ? remoteProfiles.map((p) => p['name'] as String).join(', ')
+        : 'Appareil';
+    await db.logSyncSession(
+      peerName: peerName,
+      direction: isInitiator ? 'outgoing' : 'incoming',
+      appliedCount: appliedCount,
+      pendingCount: newPendingChanges,
+      conflictCount: newConflicts,
+    );
 
     return _SyncSessionResult(newConflicts: newConflicts, newPendingChanges: newPendingChanges);
   }

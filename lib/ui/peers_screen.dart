@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../sync/sync_service.dart';
 import 'conflict_resolution_screen.dart';
 import 'review_changes_screen.dart';
+import 'sync_history_screen.dart';
 
 class PeersScreen extends StatelessWidget {
   const PeersScreen({super.key});
@@ -13,7 +14,18 @@ class PeersScreen extends StatelessWidget {
     final sync = context.watch<SyncService>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Synchroniser')),
+      appBar: AppBar(
+        title: const Text('Synchroniser'),
+        actions: [
+          IconButton(
+            tooltip: 'Historique',
+            icon: const Icon(Icons.history),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SyncHistoryScreen()),
+            ),
+          ),
+        ],
+      ),
       body: Column(
         children: [
           if (sync.statusMessage != null)
