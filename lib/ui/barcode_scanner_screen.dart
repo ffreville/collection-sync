@@ -2,9 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 /// Scans one barcode and pops with its raw value — the caller (item edit
-/// screen) is the one that knows what to do with it (look it up, prefill).
+/// screen, QR pairing screen) is the one that knows what to do with it.
 class BarcodeScannerScreen extends StatefulWidget {
-  const BarcodeScannerScreen({super.key});
+  final String title;
+  final String hint;
+
+  /// Square viewfinder for QR codes, wide one for product barcodes.
+  final bool square;
+
+  const BarcodeScannerScreen({
+    super.key,
+    this.title = 'Scanner un code-barres',
+    this.hint = 'Visez le code-barres de l’objet',
+    this.square = false,
+  });
 
   @override
   State<BarcodeScannerScreen> createState() => _BarcodeScannerScreenState();
@@ -25,7 +36,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Scanner un code-barres'),
+        title: Text(widget.title),
         foregroundColor: Colors.white,
         backgroundColor: Colors.black,
       ),
@@ -36,18 +47,15 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
           MobileScanner(onDetect: _onDetect),
           Container(
             width: 260,
-            height: 140,
+            height: widget.square ? 260 : 140,
             decoration: BoxDecoration(
               border: Border.all(color: Colors.white, width: 2),
               borderRadius: BorderRadius.circular(16),
             ),
           ),
-          const Positioned(
+          Positioned(
             bottom: 40,
-            child: Text(
-              'Visez le code-barres de l’objet',
-              style: TextStyle(color: Colors.white),
-            ),
+            child: Text(widget.hint, style: const TextStyle(color: Colors.white)),
           ),
         ],
       ),

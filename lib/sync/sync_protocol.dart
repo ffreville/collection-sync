@@ -1,11 +1,6 @@
-import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
-
 /// One message of the sync protocol: a `type` tag plus a JSON payload.
-/// Messages are framed as newline-delimited JSON ("ndjson") over the raw
-/// TCP socket — `jsonEncode` always escapes literal newlines inside string
-/// values, so splitting on '\n' is safe.
+/// How messages travel is up to the [MessageChannel] implementation — the
+/// protocol itself (SyncService._runSyncSession) doesn't care.
 class SyncMessage {
   final String type;
   final Map<String, dynamic> payload;
@@ -20,27 +15,18 @@ class SyncMessage {
   Map<String, dynamic> toJson() => {'type': type, 'payload': payload};
 }
 
-/// Wraps a raw [Socket] to send/receive [SyncMessage]s.
-class MessageChannel {
-  final Socket _socket;
-  late final Stream<SyncMessage> messages;
+/// A bidirectional, ordered pipe of [SyncMessage]s between two devices.
+/// Two transports implement it: a raw TCP socket between two native apps
+/// found over mDNS (socket_channel.dart), and a WebRTC data channel paired
+/// by QR code, which is the only option a browser has (webrtc_channel.dart).
+abstract class MessageChannel {
+  /// Every incoming message, in order. Errors (then closes) if the
+  /// connection drops before [close] is called.
+  Stream<SyncMessage> get messages;
 
-  MessageChannel(this._socket) {
-    messages = _socket
-        .cast<List<int>>()
-        .transform(utf8.decoder)
-        .transform(const LineSplitter())
-        .where((line) => line.trim().isNotEmpty)
-        .map((line) => SyncMessage.fromJson(
-            jsonDecode(line) as Map<String, dynamic>))
-        .asBroadcastStream();
-  }
+  /// Queues [message] for sending; messages go out in call order.
+  void send(SyncMessage message);
 
-  void send(SyncMessage message) {
-    _socket.add(utf8.encode('${jsonEncode(message.toJson())}\n'));
-  }
-
-  Future<void> close() async {
-    await _socket.close();
-  }
+  /// Flushes whatever [send] still has queued, then closes the connection.
+  Future<void> close();
 }

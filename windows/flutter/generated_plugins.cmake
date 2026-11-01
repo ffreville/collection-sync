@@ -5,6 +5,7 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   bonsoir_windows
   file_selector_windows
+  flutter_webrtc
   share_plus
   url_launcher_windows
 )

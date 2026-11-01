@@ -2,10 +2,11 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
+
+import 'connection/connection.dart';
 
 part 'database.g.dart';
 
@@ -169,7 +170,7 @@ class ItemSearchResult {
 
 @DriftDatabase(tables: [KnownUsers, Profiles, Universes, Collections, Items, SyncLogs])
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(_openConnection());
+  AppDatabase() : super(openConnection());
   AppDatabase.forTesting(super.executor);
 
   @override
@@ -338,19 +339,47 @@ class AppDatabase extends _$AppDatabase {
   /// local purge, not a synced deletion — you don't own that content, so
   /// there's no version to bump and nothing is sent to anyone. Syncing with
   /// that peer again later just re-downloads whatever they still have.
+  /// Whether a local profile owns any live (non-deleted) content.
+  Future<bool> profileHasContent(String profileId) async {
+    final universe = await (select(universes)
+          ..where((t) => t.ownerId.equals(profileId) & t.deleted.equals(false))
+          ..limit(1))
+        .getSingleOrNull();
+    if (universe != null) return true;
+    final collection = await (select(collections)
+          ..where((t) => t.ownerId.equals(profileId) & t.deleted.equals(false))
+          ..limit(1))
+        .getSingleOrNull();
+    if (collection != null) return true;
+    final item = await (select(items)
+          ..where((t) => t.ownerId.equals(profileId) & t.deleted.equals(false))
+          ..limit(1))
+        .getSingleOrNull();
+    return item != null;
+  }
+
+  /// Removes a local profile that owns no live content (check with
+  /// [profileHasContent] first), along with its tombstones. Content that was
+  /// ever synced elsewhere can't be dropped this way: peers would send it
+  /// back as someone else's on the next sync.
+  Future<void> deleteEmptyProfile(String profileId) {
+    return transaction(() async {
+      if (await profileHasContent(profileId)) {
+        throw StateError('Profile $profileId still owns content');
+      }
+      await (delete(items)..where((t) => t.ownerId.equals(profileId))).go();
+      await (delete(collections)..where((t) => t.ownerId.equals(profileId))).go();
+      await (delete(universes)..where((t) => t.ownerId.equals(profileId))).go();
+      await (delete(profiles)..where((t) => t.id.equals(profileId))).go();
+    });
+  }
+
   Future<void> forgetKnownUser(String userId) {
     return transaction(() async {
       await (delete(items)..where((t) => t.ownerId.equals(userId))).go();
       await (delete(collections)..where((t) => t.ownerId.equals(userId))).go();
       await (delete(universes)..where((t) => t.ownerId.equals(userId))).go();
       await (delete(knownUsers)..where((t) => t.id.equals(userId))).go();
-    });
-  }
-
-  static QueryExecutor _openConnection() {
-    return LazyDatabase(() async {
-      final file = await resolveDatabaseFile();
-      return NativeDatabase.createInBackground(file);
     });
   }
 }

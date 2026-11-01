@@ -232,9 +232,19 @@ class _ProfileTile extends StatelessWidget {
       subtitle: Text(isActive ? 'Actif sur cet appareil' : 'Accès complet'),
       trailing: isActive
           ? const Chip(label: Text('Actif'))
-          : TextButton(
-              onPressed: () => sync.switchActiveProfile(profile),
-              child: const Text('Activer'),
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(
+                  onPressed: () => sync.switchActiveProfile(profile),
+                  child: const Text('Activer'),
+                ),
+                IconButton(
+                  tooltip: 'Supprimer ce profil',
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: () => _deleteProfile(context),
+                ),
+              ],
             ),
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
@@ -246,6 +256,53 @@ class _ProfileTile extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Only empty, inactive profiles — see [AppDatabase.deleteEmptyProfile].
+  Future<void> _deleteProfile(BuildContext context) async {
+    final db = context.read<AppDatabase>();
+    if (await db.profileHasContent(profile.id)) {
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Profil non vide'),
+          content: Text(
+            '${profile.name} possède encore des univers, collections ou objets. '
+            'Supprimez-les d’abord pour pouvoir supprimer ce profil.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    if (!context.mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Supprimer ce profil ?'),
+        content: Text('Le profil ${profile.name}, vide, sera retiré de cet appareil.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await db.deleteEmptyProfile(profile.id);
+    // Stop advertising it to other devices.
+    await sync.refreshBroadcast();
   }
 }
 

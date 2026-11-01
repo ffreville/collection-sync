@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../sync/sync_service.dart';
 import 'conflict_resolution_screen.dart';
+import 'qr_sync_screen.dart';
 import 'review_changes_screen.dart';
 import 'sync_history_screen.dart';
 
@@ -72,27 +73,84 @@ class PeersScreen extends StatelessWidget {
                 ),
               ),
             ),
-          const Divider(height: 32),
-          Expanded(
-            child: sync.peers.isEmpty
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text(
-                        "Recherche d'appareils sur le même réseau Wi-Fi...\n"
-                        "Ouvrez l'app sur l'autre téléphone et vérifiez qu'il "
-                        "est sur le même Wi-Fi.",
-                        textAlign: TextAlign.center,
+          const _QrPairingCard(),
+          if (sync.lan.isSupported) ...[
+            const Divider(height: 32),
+            Expanded(
+              child: sync.peers.isEmpty
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text(
+                          "Recherche d'appareils sur le même réseau Wi-Fi...\n"
+                          "Ouvrez l'app sur l'autre téléphone et vérifiez qu'il "
+                          "est sur le même Wi-Fi.",
+                          textAlign: TextAlign.center,
+                        ),
                       ),
+                    )
+                  : ListView(
+                      children: sync.peers
+                          .map((peer) => _PeerCard(peer: peer, sync: sync))
+                          .toList(),
                     ),
-                  )
-                : ListView(
-                    children: sync.peers
-                        .map((peer) => _PeerCard(peer: peer, sync: sync))
-                        .toList(),
-                  ),
-          ),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+/// Pairing by QR code (WebRTC) — the only way for the web version, and a
+/// fallback for the app when automatic discovery doesn't find the other
+/// device (e.g. a browser on the other end, or a network blocking mDNS).
+class _QrPairingCard extends StatelessWidget {
+  const _QrPairingCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final sync = context.watch<SyncService>();
+    final busy = sync.status == SyncStatus.connecting || sync.status == SyncStatus.syncing;
+    void open(QrSyncRole role) => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => QrSyncScreen(role: role)),
+        );
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Par QR code', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(
+              sync.lan.isSupported
+                  ? "Avec la version web, ou si l'autre appareil n'apparaît pas "
+                      'ci-dessous. Même Wi-Fi requis.'
+                  : "Avec l'application ou une autre version web, sur le même "
+                      "Wi-Fi. L'un démarre, l'autre rejoint.",
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(
+                  onPressed: busy ? null : () => open(QrSyncRole.start),
+                  icon: const Icon(Icons.qr_code),
+                  label: const Text('Démarrer une synchro'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: busy ? null : () => open(QrSyncRole.join),
+                  icon: const Icon(Icons.qr_code_scanner),
+                  label: const Text('Rejoindre une synchro'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

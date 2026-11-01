@@ -1,11 +1,11 @@
 {
-    "name": "collection_sync",
-    "short_name": "collection_sync",
+    "name": "CollectionSync",
+    "short_name": "CollectionSync",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#241F1B",
+    "theme_color": "#241F1B",
+    "description": "Gérez vos collections et synchronisez-les directement entre vos appareils, sans serveur.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

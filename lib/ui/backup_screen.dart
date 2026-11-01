@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -37,21 +38,32 @@ class _BackupScreenState extends State<BackupScreen> {
             'téléphone.',
           ),
           const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: _busy ? null : _export,
-            icon: const Icon(Icons.ios_share),
-            label: const Text('Exporter une sauvegarde'),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: _busy ? null : _restore,
-            icon: const Icon(Icons.restore),
-            label: const Text('Restaurer une sauvegarde'),
-          ),
-          if (_busy) const Padding(
-            padding: EdgeInsets.only(top: 24),
-            child: Center(child: CircularProgressIndicator()),
-          ),
+          // The backup is a copy of the sqlite *file*; on the web the
+          // database lives inside the browser's storage, out of reach.
+          if (kIsWeb)
+            const Text(
+              "La sauvegarde n'est pas encore disponible dans la version web. "
+              "En attendant, synchronisez régulièrement avec un autre appareil : "
+              'il garde une copie de vos collections.',
+            )
+          else ...[
+            FilledButton.icon(
+              onPressed: _busy ? null : _export,
+              icon: const Icon(Icons.ios_share),
+              label: const Text('Exporter une sauvegarde'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _busy ? null : _restore,
+              icon: const Icon(Icons.restore),
+              label: const Text('Restaurer une sauvegarde'),
+            ),
+          ],
+          if (_busy)
+            const Padding(
+              padding: EdgeInsets.only(top: 24),
+              child: Center(child: CircularProgressIndicator()),
+            ),
         ],
       ),
     );
@@ -84,8 +96,11 @@ class _BackupScreenState extends State<BackupScreen> {
     if (picked == null || !mounted) return;
 
     final bytes = await picked.readAsBytes();
-    if (bytes.length < 16 || utf8.decode(bytes.sublist(0, 15)) != 'SQLite format 3') {
-      _showMessage("Ce fichier ne ressemble pas à une sauvegarde CollectionSync.");
+    if (bytes.length < 16 ||
+        utf8.decode(bytes.sublist(0, 15)) != 'SQLite format 3') {
+      _showMessage(
+        "Ce fichier ne ressemble pas à une sauvegarde CollectionSync.",
+      );
       return;
     }
 
@@ -153,6 +168,7 @@ class _BackupScreenState extends State<BackupScreen> {
 
   void _showMessage(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 }

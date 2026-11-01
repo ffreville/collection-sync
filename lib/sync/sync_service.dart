@@ -1,9 +1,6 @@
-import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
+export 'lan/lan_discovery.dart' show DiscoveredPeer, DiscoveredProfile;
 
 import 'package:async/async.dart';
-import 'package:bonsoir/bonsoir.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
@@ -13,68 +10,33 @@ import 'conflicts.dart';
 import 'device_identity.dart';
 import 'entities.dart';
 import 'item_payload.dart';
+import 'lan/lan_discovery.dart';
 import 'pending_change.dart';
 import 'sync_protocol.dart';
 import 'universe_payload.dart';
 
-/// mDNS/Bonjour service type this app advertises and looks for.
-/// Syntax: _ServiceType._tcp — see the bonsoir package docs.
-const String kServiceType = '_collectionsync._tcp';
-
 /// Bumped if the wire format ever changes in a backwards-incompatible way.
 const int kSchemaVersion = 3;
 
-/// One profile advertised by a discovered device — see [DiscoveredPeer].
-class DiscoveredProfile {
-  final String id;
-  final String name;
-  const DiscoveredProfile({required this.id, required this.name});
-}
-
-class DiscoveredPeer {
-  final String deviceId;
-  final String deviceName;
-  final String host;
-  final int port;
-
-  /// The local, fully-editable profiles that device is currently hosting —
-  /// parsed from its mDNS announcement (see _startBroadcast). A device can
-  /// host several (docs/spec-universes-collections.md); this is what lets
-  /// the sync screen offer "which profile do you want to sync" rather than
-  /// just "which device".
-  final List<DiscoveredProfile> profiles;
-
-  const DiscoveredPeer({
-    required this.deviceId,
-    required this.deviceName,
-    required this.host,
-    required this.port,
-    this.profiles = const [],
-  });
-}
-
 enum SyncStatus { idle, connecting, syncing, done, error }
 
-/// Owns local-network discovery (via mDNS/Bonjour, through the `bonsoir`
-/// package) and the sync sessions themselves (plain TCP sockets, no server
-/// involved anywhere). Each session syncs Universes, then Collections, then
-/// Items, in that order — see _runSyncSession.
+/// Owns the sync sessions themselves, whatever carries them: devices found
+/// automatically on the local network ([lan] — mDNS + TCP, native only) or
+/// paired by QR code over WebRTC (see webrtc_pairing.dart, the only option
+/// in a browser). No server involved anywhere. Each session syncs
+/// Universes, then Collections, then Items, in that order — see
+/// _runSyncSession.
 class SyncService extends ChangeNotifier {
   final AppDatabase db;
   final DeviceIdentity identity;
+  final LanDiscovery lan;
 
-  ServerSocket? _server;
-  BonsoirBroadcast? _broadcast;
-  BonsoirDiscovery? _discovery;
-
-  final Map<String, DiscoveredPeer> _peers = {};
-
-  List<DiscoveredPeer> get peers => _peers.values.toList(growable: false);
+  List<DiscoveredPeer> get peers => lan.peers;
 
   /// Whether the given *profile* — not device — is currently reachable on
   /// the network, i.e. some discovered device is advertising it right now.
   bool isOnline(String profileId) =>
-      _peers.values.any((peer) => peer.profiles.any((p) => p.id == profileId));
+      peers.any((peer) => peer.profiles.any((p) => p.id == profileId));
 
   SyncStatus status = SyncStatus.idle;
   String? statusMessage;
@@ -90,53 +52,19 @@ class SyncService extends ChangeNotifier {
   /// docs/spec-universes-collections.md and PendingChange's doc comment.
   final List<PendingChange> pendingChanges = [];
 
-  SyncService({required this.db, required this.identity});
+  SyncService({required this.db, required this.identity}) : lan = LanDiscovery(identity);
 
   Future<void> start() async {
-    _server = await ServerSocket.bind(InternetAddress.anyIPv4, 0);
-    _server!.listen(_acceptIncoming);
-
-    await _startBroadcast();
-
-    _discovery = BonsoirDiscovery(type: kServiceType);
-    await _discovery!.initialize();
-    _discovery!.eventStream!.listen(_onDiscoveryEvent);
-    await _discovery!.start();
-  }
-
-  /// Announces this device *and every local profile it hosts* — a bare
-  /// device name wouldn't be enough for peers to offer "choose which
-  /// profile to sync" (see DiscoveredPeer.profiles). The list travels as a
-  /// JSON blob in one mDNS TXT attribute, which keeps this to a handful of
-  /// short-named profiles (each TXT string is capped at 255 bytes by the
-  /// mDNS spec) — plenty for a family sharing a device, but a known limit.
-  Future<void> _startBroadcast() async {
-    final localProfiles = await db.select(db.profiles).get();
-    final service = BonsoirService(
-      name: '${identity.name}-${identity.deviceId.substring(0, 8)}',
-      type: kServiceType,
-      port: _server!.port,
-      attributes: {
-        'deviceId': identity.deviceId,
-        'profiles': jsonEncode(
-          localProfiles.map((p) => {'id': p.id, 'name': p.name}).toList(),
-        ),
-      },
+    await lan.start(
+      localProfiles: () async => (await db.select(db.profiles).get())
+          .map((p) => DiscoveredProfile(id: p.id, name: p.name))
+          .toList(),
+      onIncoming: acceptIncoming,
+      onPeersChanged: notifyListeners,
     );
-    _broadcast = BonsoirBroadcast(service: service);
-    await _broadcast!.initialize();
-    await _broadcast!.start();
   }
 
-  /// Re-announces this device with its current profile list. The broadcast
-  /// is created once (in [start]) from whatever profiles existed then — if
-  /// the active profile's name changes, or a profile is added, other
-  /// devices keep seeing the old announcement until this runs, since
-  /// Bonjour doesn't let us edit a live announcement's attributes in place.
-  Future<void> refreshBroadcast() async {
-    await _broadcast?.stop();
-    await _startBroadcast();
-  }
+  Future<void> refreshBroadcast() => lan.refreshBroadcast();
 
   /// Switches which local profile owns whatever you create from now on, and
   /// re-announces so peers see the change — see DeviceIdentity's doc comment.
@@ -146,79 +74,18 @@ class SyncService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> stop() async {
-    await _discovery?.stop();
-    await _broadcast?.stop();
-    await _server?.close();
-  }
-
-  void _onDiscoveryEvent(BonsoirDiscoveryEvent event) {
-    switch (event) {
-      case BonsoirDiscoveryServiceFoundEvent():
-        final service = event.service;
-        if (service.attributes['deviceId'] == identity.deviceId) {
-          return; // that's our own broadcast, ignore it
-        }
-        service.resolve(_discovery!.serviceResolver);
-      case BonsoirDiscoveryServiceResolvedEvent():
-        _registerResolvedService(event.service);
-      case BonsoirDiscoveryServiceUpdatedEvent():
-        _registerResolvedService(event.service);
-      case BonsoirDiscoveryServiceLostEvent():
-        final deviceId = event.service.attributes['deviceId'];
-        if (deviceId != null) _peers.remove(deviceId);
-        notifyListeners();
-      default:
-        break;
-    }
-  }
-
-  void _registerResolvedService(BonsoirService service) {
-    final deviceId = service.attributes['deviceId'];
-    if (deviceId == null || deviceId == identity.deviceId) return;
-    final host = _pickAddress(service.hostAddresses);
-    if (host == null) return;
-
-    final profiles = <DiscoveredProfile>[];
-    final profilesJson = service.attributes['profiles'];
-    if (profilesJson != null) {
-      try {
-        for (final entry in jsonDecode(profilesJson) as List) {
-          profiles.add(DiscoveredProfile(id: entry['id'] as String, name: entry['name'] as String));
-        }
-      } catch (e) {
-        debugPrint('Could not parse profiles from $deviceId\'s announcement: $e');
-      }
-    }
-
-    _peers[deviceId] = DiscoveredPeer(
-      deviceId: deviceId,
-      deviceName: profiles.isNotEmpty ? profiles.map((p) => p.name).join(', ') : 'Appareil',
-      host: host,
-      port: service.port,
-      profiles: profiles,
-    );
-    notifyListeners();
-  }
-
-  /// Prefer an IPv4 address (simple, no zone-id/bracket headaches); fall
-  /// back to whatever was resolved otherwise.
-  String? _pickAddress(List<String> addresses) {
-    if (addresses.isEmpty) return null;
-    final ipv4 = addresses.where((a) => !a.contains(':'));
-    return ipv4.isNotEmpty ? ipv4.first : addresses.first;
-  }
+  Future<void> stop() => lan.stop();
 
   /// A device that didn't ask for this sync just gets it — everything the
-  /// peer sends applies automatically, exactly like before. Reviewing
-  /// proposed changes (see [pendingChanges]) is only for the initiating side.
-  Future<void> _acceptIncoming(Socket socket) async {
-    final channel = MessageChannel(socket);
+  /// peer sends applies automatically. Reviewing proposed changes (see
+  /// [pendingChanges]) is only for the initiating side.
+  Future<void> acceptIncoming(MessageChannel channel) async {
     try {
       await _runSyncSession(channel, isInitiator: false);
       notifyListeners();
     } catch (e) {
       debugPrint('Sync (incoming) failed: $e');
+      rethrow;
     } finally {
       await channel.close();
     }
@@ -233,30 +100,33 @@ class SyncService extends ChangeNotifier {
     final focusName = focusProfileId == null
         ? null
         : peer.profiles.firstWhere((p) => p.id == focusProfileId, orElse: () => const DiscoveredProfile(id: '', name: '')).name;
+    final label = focusName?.isNotEmpty == true ? focusName! : peer.deviceName;
     status = SyncStatus.connecting;
-    statusMessage = 'Connexion à ${focusName?.isNotEmpty == true ? focusName : peer.deviceName}...';
+    statusMessage = 'Connexion à $label...';
     notifyListeners();
 
-    Socket socket;
+    MessageChannel channel;
     try {
-      final address = peer.host.contains(':')
-          ? InternetAddress(peer.host, type: InternetAddressType.IPv6)
-          : InternetAddress(peer.host, type: InternetAddressType.IPv4);
-      socket = await Socket.connect(
-        address,
-        peer.port,
-        timeout: const Duration(seconds: 8),
-      );
+      channel = await lan.connect(peer);
     } catch (e) {
       status = SyncStatus.error;
       statusMessage = 'Connexion impossible : $e';
       notifyListeners();
       return;
     }
+    await syncOverChannel(channel, peerLabel: label, focusProfileId: focusProfileId);
+  }
 
-    final channel = MessageChannel(socket);
+  /// Runs a sync *you* asked for over an already-open [channel] (TCP from
+  /// [syncWith], or WebRTC once QR pairing is done), reporting progress
+  /// through [status]/[statusMessage]. Closes [channel] when done.
+  Future<void> syncOverChannel(
+    MessageChannel channel, {
+    required String peerLabel,
+    String? focusProfileId,
+  }) async {
     status = SyncStatus.syncing;
-    statusMessage = 'Synchronisation avec ${focusName?.isNotEmpty == true ? focusName : peer.deviceName}...';
+    statusMessage = 'Synchronisation avec $peerLabel...';
     notifyListeners();
 
     try {
